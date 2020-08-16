@@ -3,6 +3,5 @@
 
 
 To-do:  
-    - [ ] Chane variable to hold `Rc<RefCell<Ndarray>>` insted of data.
+    - [ ] use not_ready for evaluation of function. engine.cpp:775. that's why test_mul_add is failing  
     - [ ] impl -, /, pow, exp 
-
