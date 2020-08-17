@@ -1,6 +1,6 @@
 use crate::ops::*;
 use crate::tensor::*;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, VecDeque};
 use std::rc::{Rc, Weak};
 
@@ -16,8 +16,9 @@ impl ReadyQueue {
     }
 
     pub fn push(&mut self, task: NodeTask) {
-        // let graph_task = Weak::upgrade(&task.base_).unwrap();
-        // graph_task.borrow_mut().outstanding_tasks += 1;
+        let graph_task = Weak::upgrade(&task.base_).unwrap();
+        let outstanding_task = graph_task.borrow().outstanding_tasks.as_ptr();
+        unsafe { *outstanding_task = *outstanding_task + 1 };
         self.heap.push_back(task);
     }
 
@@ -27,28 +28,32 @@ impl ReadyQueue {
 }
 
 pub struct GraphTask {
-    pub dependencies: HashMap<*const Node, usize>,
+    pub dependencies: RefCell<HashMap<*const Node, usize>>,
     pub depth: usize,
     pub ready_queue: Rc<RefCell<ReadyQueue>>,
-    pub outstanding_tasks: u32,
-    pub grad_mode: bool
+    pub outstanding_tasks: Cell<u32>,
+    pub grad_mode: bool,
+    pub not_ready_queue: RefCell<HashMap<*const Node, InputBuffer>>,
 }
 
 // Todo: Use ReadyQueue instead of VecDeque for push logic which increaments outstanding_task.
 impl GraphTask {
     pub fn new(grad_mode: bool, depth: usize, ready_queue: Rc<RefCell<ReadyQueue>>) -> Self {
         let t: HashMap<*const Node, usize> = HashMap::new();
+        let not_ready_queue: HashMap<*const Node, InputBuffer> = HashMap::new();
         GraphTask {
             depth,
-            dependencies: t,
+            dependencies: RefCell::new(t),
             ready_queue,
-            outstanding_tasks: 0,
-            grad_mode 
+            outstanding_tasks: Cell::new(0),
+            grad_mode,
+            not_ready_queue: RefCell::new(not_ready_queue),
         }
     }
 
     pub fn completed(&self) -> bool {
-        self.outstanding_tasks == 0
+        let t = self.outstanding_tasks.get();
+        t == 0
     }
 }
 
@@ -67,11 +72,19 @@ impl InputBuffer {
         other.buffer
     }
 
-    pub fn add(&mut self, pos: usize, var: Tensor) {
+    pub fn add(&mut self, pos: usize, tensor: Tensor) {
         assert!(pos < self.buffer.capacity());
-        self.buffer.insert(pos, var);
+        match self.buffer.get(pos) {
+            Some(_) => accumulate(&mut self.buffer, pos, tensor),
+            None => self.buffer.insert(pos, tensor),
+        }
     }
+}
 
+pub fn accumulate(buffer: &mut VariableList, pos: usize, tensor: Tensor) {
+    let old_var = buffer.remove(pos);
+    //Todo: use sparse tensor logic. currently performs basic accumulation
+    buffer.insert(pos, old_var + tensor);
 }
 
 pub struct NodeTask {

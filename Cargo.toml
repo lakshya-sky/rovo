@@ -13,3 +13,7 @@ num-traits = "0.2"
 dyn-clone = "1.0.2"
 reduce = "0.1"
 smallvec = "1.4.1"
+
+# see more at: https://github.com/rust-lang/rust/pull/38699
+[profile.dev]
+opt-level = 1

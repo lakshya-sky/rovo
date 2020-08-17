@@ -20,9 +20,9 @@ impl Engine {
     pub fn compute_dependencies(root: *const Node, graph_task: &mut GraphTask) {
         let mut seen: HashSet<*const Node> = HashSet::new();
         let mut queue: Vec<*const Node> = vec![root];
-        let dependencies = &mut graph_task.dependencies;
+        let dependencies = &mut graph_task.dependencies.borrow_mut();
         loop {
-            eprintln!("dependencies: {:?}", dependencies);
+            // eprintln!("dependencies: {:?}", dependencies);
             if queue.is_empty() {
                 break;
             }
@@ -55,11 +55,16 @@ impl Engine {
         func: Rc<RefCell<Node>>,
         inputs: InputBuffer,
     ) {
+        let _fnc = func.as_ptr();
+        println!("Current Function: {:?}", _fnc);
         let outputs = Self::call_function(func.as_ptr(), inputs);
         let fn_ = func.borrow_mut();
         let num_outputs = outputs.len();
+        println!("Num_outputs: {}", num_outputs);
         let mut i = 0usize;
-        let task = &mut graph_task.borrow_mut();
+        let task = graph_task.borrow();
+        let mut dependencies = task.dependencies.borrow_mut();
+        eprintln!("dependencies: {:?}", dependencies);
         loop {
             if i >= num_outputs {
                 break;
@@ -71,41 +76,61 @@ impl Engine {
             }
             let next = next.unwrap();
             let mut is_ready = false;
-            let dependencies = &mut task.dependencies;
             let t = next.function.as_ref().unwrap().as_ptr() as *const Node;
             let it = dependencies.get_mut(&t);
             if it.is_none() {
                 panic!()
             } else {
-                let mut count = *(it.unwrap());
-                count -= 1;
-                if count == 0 {
-                    let _q = dependencies.remove_entry(&t);
+                let count = it.unwrap();
+                *count -= 1;
+                eprintln!("Current Dependency: {:?} and count: {}", &t, count);
+                if *count == 0 {
+                    let _ = dependencies.remove(&t);
                     is_ready = true;
                 }
             }
-            let mut input_buffer = InputBuffer::new_with_size(unsafe { &*t }.num_inputs());
-            input_buffer.add(next.input_nr, output);
-            if is_ready {
-                {
-                    let mut queue = (&task).ready_queue.borrow_mut();
+
+            let mut queue = task.ready_queue.borrow_mut();
+            let mut not_ready = task.not_ready_queue.borrow_mut();
+
+            if let Some(input_buffer) = not_ready.get_mut(&t) {
+                eprintln!("Dependency {:?} exists in not_ready", &t);
+                input_buffer.add(next.input_nr, output);
+                if is_ready {
+                    println!("Pushing node from not_ready to ready queue");
                     queue.push(NodeTask::new(
                         Rc::downgrade(&graph_task.clone()),
                         next.function.as_ref().unwrap().clone(),
-                        input_buffer,
+                        not_ready.remove(&t).unwrap(),
                     ));
                 }
-                task.outstanding_tasks += 1;
+            } else {
+                let mut input_buffer = InputBuffer::new_with_size(unsafe { &*t }.num_inputs());
+                input_buffer.add(next.input_nr, output);
+                if is_ready {
+                    {
+                        queue.push(NodeTask::new(
+                            Rc::downgrade(&graph_task.clone()),
+                            next.function.as_ref().unwrap().clone(),
+                            input_buffer,
+                        ));
+                    }
+                // let outstanding_task = task.outstanding_tasks.as_ptr();
+                // unsafe { *outstanding_task = *outstanding_task + 1 };
+                } else {
+                    eprintln!("Inserting Node in not_ready_queue");
+                    not_ready.insert(t, input_buffer);
+                }
             }
             i += 1;
         }
     }
 
     pub fn thread_main(&mut self, graph_task: &Rc<RefCell<GraphTask>>) {
+        let graph_task = graph_task.borrow();
         loop {
-            {
-                eprintln!("Outstanding task: {}", graph_task.borrow().outstanding_tasks);
-            }
+            eprintln!("Outstanding task: {}", graph_task.outstanding_tasks.get());
+
             let local_graph_task;
             {
                 let task = self.local_ready_queue.borrow_mut().pop();
@@ -118,10 +143,11 @@ impl Engine {
                     AutoGradMode::new(unsafe { &*local_graph_task.as_ptr() }.grad_mode);
                 self.evaluate_function(local_graph_task.clone(), task.fn_, task.inputs_);
             }
-            {
-                graph_task.borrow_mut().outstanding_tasks -= 1;
-            }
-            if graph_task.borrow().completed() {
+
+            let outstanding_task = graph_task.outstanding_tasks.as_ptr();
+            unsafe { *outstanding_task = *outstanding_task - 1 };
+
+            if graph_task.completed() {
                 break;
             }
         }
@@ -132,15 +158,13 @@ impl Engine {
         task: &Rc<RefCell<GraphTask>>,
         root: Rc<RefCell<Node>>,
     ) {
-        task.borrow_mut()
-            .ready_queue
-            .borrow_mut()
-            .push(NodeTask::new(
-                Rc::downgrade(&task.clone()),
-                root,
-                InputBuffer::new_with_size(0),
-            ));
-        task.borrow_mut().outstanding_tasks += 1;
+        task.borrow().ready_queue.borrow_mut().push(NodeTask::new(
+            Rc::downgrade(&task.clone()),
+            root,
+            InputBuffer::new_with_size(0),
+        ));
+        // let outstanding_task = task.borrow().outstanding_tasks.as_ptr();
+        // unsafe { *outstanding_task = *outstanding_task + 1 };
         self.thread_main(task);
     }
 

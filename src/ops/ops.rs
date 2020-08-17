@@ -144,8 +144,10 @@ pub struct AddBackwardTensors {
 impl AddBackwardTensors {
     pub fn call(&mut self, mut grads: Vec<Tensor>) -> Vec<Tensor> {
         let _tmp: Vec<_> = grads.drain(1..).collect();
-        let grad = grads.pop().unwrap();
-        vec![grad]
+        let grad = grads.get(0).unwrap().clone();
+        let grad_1 = grad.clone();
+        let grad_2 = grad.clone();
+        vec![grad_1, grad_2]
     }
 
     pub fn set_next_edges(&mut self, edges: Vec<Edge>) {
