@@ -1,7 +1,7 @@
 # Rovo
-
+## Experimental Tensor Libary in Rust inspired from Pytorch.
 
 
 To-do:  
-    - [ ] use not_ready for evaluation of function. engine.cpp:775. that's why test_mul_add is failing  
-    - [ ] impl -, /, pow, exp 
+    - [x] use not_ready for evaluation of function.  
+    - [ ] impl -, /, pow, exp operators
