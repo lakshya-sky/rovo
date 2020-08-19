@@ -175,7 +175,7 @@ impl Engine {
         create_graph: bool,
         _output_edges: &mut EdgeList,
     ) {
-        let graph_root = Node::GraphRoot(GraphRoot::new(roots, inputs));
+        let graph_root = Node::new(GraphRoot::new(roots, inputs));
         let mut task = GraphTask::new(create_graph, 0, self.local_ready_queue.clone());
         Self::compute_dependencies(&graph_root, &mut task);
         let task = Rc::new(RefCell::new(task));

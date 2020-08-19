@@ -3,7 +3,6 @@ use num;
 use num_traits;
 use std::fmt;
 
-
 pub type NdArray<T> = ndarray::Array<T, ndarray::IxDyn>;
 pub type NdArrayView<'a, T> = ndarray::ArrayView<'a, T, ndarray::IxDyn>;
 pub trait Float:
@@ -31,8 +30,6 @@ impl<T> Float for T where
         + 'static
 {
 }
-
-
 
 #[inline]
 /// Creates an ndarray filled with 0s.

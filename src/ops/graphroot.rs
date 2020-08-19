@@ -1,6 +1,5 @@
+use crate::ops::NodeTrait;
 use crate::tensor::*;
-
-#[derive(Debug)]
 pub struct GraphRoot {
     next_edges: Option<EdgeList>,
     outputs: VariableList,
@@ -13,37 +12,38 @@ impl GraphRoot {
             outputs: inputs,
         }
     }
-
-    pub fn call(&mut self, _input: VariableList) -> VariableList {
+}
+impl NodeTrait for GraphRoot {
+    fn call(&mut self, _input: VariableList) -> VariableList {
         // self.outputs
         let outputs = self.outputs.as_slice().to_vec();
         outputs
         // self.outputs.clone()
     }
 
-    pub fn set_next_edges(&mut self, _edges: EdgeList) {
+    fn set_next_edges(&mut self, _edges: EdgeList) {
         todo!()
     }
 
-    pub fn add_input_metadata(&mut self, _tensor: &Tensor) -> usize {
+    fn add_input_metadata(&mut self, _tensor: &Tensor) -> usize {
         todo!()
     }
 
-    pub fn next_edges(&self) -> Option<&EdgeList> {
+    fn next_edges(&self) -> Option<&EdgeList> {
         self.next_edges.as_ref()
     }
 
-    pub fn next_edge(&self, i: usize) -> Option<Edge> {
+    fn next_edge(&self, i: usize) -> Option<Edge> {
         let edges = self.next_edges.as_ref().unwrap();
         let e = edges.get(i).and_then(|e| Some(e.clone()));
         e
     }
 
-    pub fn num_inputs(&self) -> usize {
+    fn num_inputs(&self) -> usize {
         todo!()
     }
 
-    pub fn num_outputs(&self) -> usize {
+    fn num_outputs(&self) -> usize {
         todo!()
     }
 }

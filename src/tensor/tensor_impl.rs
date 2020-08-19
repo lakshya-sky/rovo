@@ -48,7 +48,6 @@ impl TensorVersion {
     }
 }
 
-#[derive(Debug)]
 pub struct TensorImpl {
     pub data: NdArray<f64>,
     pub autogradmeta: Option<AutogradMeta>,

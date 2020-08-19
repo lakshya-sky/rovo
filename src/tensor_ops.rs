@@ -5,17 +5,16 @@ use crate::util;
 use std::cell::RefCell;
 use std::ops::{Add, Mul};
 use std::rc::Rc;
+
 impl Add<Self> for Tensor {
     type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
         let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
         if util::compute_requires_grad(&[&self, &rhs]) {
-            grad_fn = Some(Rc::new(RefCell::new(Node::Function(
-                Function::AddBackwardTensors(AddBackwardTensors {
-                    next_edges: None,
-                    input_metadata_: smallvec::smallvec![],
-                }),
-            ))));
+            grad_fn = Some(Rc::new(RefCell::new(Node::new(AddBackwardTensors {
+                next_edges: None,
+                input_metadata_: smallvec::smallvec![],
+            }))));
             grad_fn
                 .as_mut()
                 .unwrap()
@@ -41,12 +40,12 @@ impl Add<Self> for &Tensor {
     fn add(self, rhs: Self) -> Self::Output {
         let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
         if util::compute_requires_grad(&[&self, &rhs]) {
-            grad_fn = Some(Rc::new(RefCell::new(Node::Function(
-                Function::AddBackwardTensors(AddBackwardTensors {
+            grad_fn = Some(Rc::new(RefCell::new(Node::new(
+                AddBackwardTensors {
                     next_edges: None,
                     input_metadata_: smallvec::smallvec![],
                 }),
-            ))));
+            )));
             grad_fn
                 .as_mut()
                 .unwrap()
@@ -81,8 +80,8 @@ impl Mul<Self> for &Tensor {
             _grad_fn.set_next_edges(util::collect_next_edges(&[&self, &rhs]));
             _grad_fn._self = Some(SavedTensor::new(self, false));
             _grad_fn.other = Some(SavedTensor::new(rhs, false));
-            grad_fn = Some(Rc::new(RefCell::new(Node::Function(
-                Function::MulBackwardTensors(_grad_fn),
+            grad_fn = Some(Rc::new(RefCell::new(Node::new(
+                _grad_fn,
             ))));
         }
         let result = &self._impl.borrow().data * &rhs._impl.borrow().data;

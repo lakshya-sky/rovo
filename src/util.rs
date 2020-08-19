@@ -69,9 +69,9 @@ pub fn grad_accumulator(tensor: &Tensor) -> Rc<RefCell<Node>> {
         if let Some(acc_) = meta.grad_accumulator_.as_ref() {
             Weak::upgrade(acc_).unwrap()
         } else {
-            let result = Rc::new(RefCell::new(Node::AccumulateGrad(AccumulateGrad::new(
-                Tensor::new(tensor),
-            ))));
+            let result = Rc::new(RefCell::new(Node::new(AccumulateGrad::new(Tensor::new(
+                tensor,
+            )))));
             meta.grad_accumulator_ = Some(Rc::downgrade(&result));
             result
         }

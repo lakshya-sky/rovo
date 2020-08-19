@@ -23,7 +23,7 @@ pub struct GradMode;
 
 impl GradMode {
     pub fn is_enabled() -> bool {
-        let t = unsafe{GRADMODE_ENABLED};
+        let t = unsafe { GRADMODE_ENABLED };
         // eprintln!("Gradmode_Status = {}", t);
         t
     }

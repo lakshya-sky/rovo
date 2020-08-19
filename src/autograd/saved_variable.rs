@@ -3,7 +3,7 @@ use crate::tensor::*;
 use crate::util;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
-#[derive(Debug)]
+
 pub struct SavedTensor {
     data: Tensor,
     grad_accumulator: Option<Weak<RefCell<Node>>>,
@@ -73,10 +73,7 @@ impl SavedTensor {
             panic!()
         }
 
-        util::TensorHook::set_grad_accumulator(
-            &mut tensor,
-            self.grad_accumulator.clone(),
-        );
+        util::TensorHook::set_grad_accumulator(&mut tensor, self.grad_accumulator.clone());
         tensor
     }
 }

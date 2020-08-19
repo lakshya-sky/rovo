@@ -1,9 +1,9 @@
 use crate::autograd::SavedTensor;
+use crate::ops::NodeTrait;
 use crate::tensor::*;
 use smallvec::*;
 use std::rc::Rc;
 
-#[derive(Debug)]
 pub struct AccumulateGrad {
     tensor: Tensor,
     next_edges: Option<Vec<Edge>>,
@@ -20,8 +20,10 @@ impl AccumulateGrad {
             input_metadata_: input_metadata,
         }
     }
+}
 
-    pub fn call(&mut self, grads: Vec<Tensor>) -> Vec<Tensor> {
+impl NodeTrait for AccumulateGrad {
+    fn call(&mut self, grads: Vec<Tensor>) -> Vec<Tensor> {
         let new_grad = &grads[0];
         let grad = self.tensor.grad();
         if let Some(g) = grad {
@@ -34,25 +36,24 @@ impl AccumulateGrad {
         Vec::new()
     }
 
-    // fn set_next_edges(&mut self, _edges: Vec<Edge>) {}
-    // fn add_input_metadata(&mut self, _tensor: &Tensor) -> usize {
-    //     todo!()
-    // }
-    // fn next_edges(&self) -> Option<&EdgeList> {
-    // None
-    // }
-    // fn next_edge(&self, _i: usize) -> Option<Edge> {
-    // pub input_metadata_: SmallVec<[InputMetaData; 2]>,
-    // }
-    pub fn num_inputs(&self) -> usize {
+    fn set_next_edges(&mut self, _edges: Vec<Edge>) {}
+    fn add_input_metadata(&mut self, _tensor: &Tensor) -> usize {
+        todo!()
+    }
+    fn next_edges(&self) -> Option<&EdgeList> {
+        None
+    }
+    fn next_edge(&self, _i: usize) -> Option<Edge> {
+        None
+    }
+    fn num_inputs(&self) -> usize {
         self.input_metadata_.len()
     }
-    // fn num_outputs(&self) -> usize {
-    //     todo!()
-    // }
+    fn num_outputs(&self) -> usize {
+        todo!()
+    }
 }
 
-#[derive(Debug)]
 pub enum Function {
     AddBackwardTensors(AddBackwardTensors),
     MulBackwardTensors(MulBackwardTensors),
@@ -60,7 +61,7 @@ pub enum Function {
 }
 
 impl Function {
-    pub fn call(&mut self, input: VariableList) -> VariableList {
+    fn call(&mut self, input: VariableList) -> VariableList {
         match self {
             Function::AddBackwardTensors(f) => f.call(input),
             Function::Add(_) => todo!(),
@@ -68,7 +69,7 @@ impl Function {
         }
     }
 
-    pub fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
         match self {
             Function::AddBackwardTensors(f) => f.add_input_metadata(tensor),
             Function::Add(_) => todo!(),
@@ -76,7 +77,7 @@ impl Function {
         }
     }
 
-    pub fn set_next_edges(&mut self, edges: Vec<Edge>) {
+    fn set_next_edges(&mut self, edges: Vec<Edge>) {
         match self {
             Function::AddBackwardTensors(f) => f.set_next_edges(edges),
             Function::Add(_) => {}
@@ -84,7 +85,7 @@ impl Function {
         }
     }
 
-    pub fn next_edges(&self) -> Option<&EdgeList> {
+    fn next_edges(&self) -> Option<&EdgeList> {
         match self {
             Function::AddBackwardTensors(f) => f.next_edges(),
             Function::Add(_) => todo!(),
@@ -92,7 +93,7 @@ impl Function {
         }
     }
 
-    pub fn next_edge(&self, i: usize) -> Option<Edge> {
+    fn next_edge(&self, i: usize) -> Option<Edge> {
         match self {
             Function::AddBackwardTensors(f) => f.next_edge(i),
             Function::Add(_) => todo!(),
@@ -100,7 +101,7 @@ impl Function {
         }
     }
 
-    pub fn num_inputs(&self) -> usize {
+    fn num_inputs(&self) -> usize {
         match self {
             Function::AddBackwardTensors(t) => t.num_inputs(),
             Function::Add(_) => todo!(),
@@ -108,7 +109,7 @@ impl Function {
         }
     }
 
-    pub fn num_outputs(&self) -> usize {
+    fn num_outputs(&self) -> usize {
         match self {
             Function::AddBackwardTensors(f) => f.num_outputs(),
             Function::Add(_) => todo!(),
@@ -127,7 +128,7 @@ pub struct InputMetaData {
 }
 
 impl InputMetaData {
-    pub fn from_tensor(_t: &Tensor) -> InputMetaData {
+    fn from_tensor(_t: &Tensor) -> InputMetaData {
         InputMetaData {
             size: SmallVec::<[usize; 4]>::new(),
             device: 0,
@@ -135,14 +136,14 @@ impl InputMetaData {
     }
 }
 
-#[derive(Debug)]
+
 pub struct AddBackwardTensors {
     pub input_metadata_: SmallVec<[InputMetaData; 2]>,
     pub next_edges: Option<EdgeList>,
 }
 
-impl AddBackwardTensors {
-    pub fn call(&mut self, mut grads: Vec<Tensor>) -> Vec<Tensor> {
+impl NodeTrait for AddBackwardTensors {
+    fn call(&mut self, mut grads: Vec<Tensor>) -> Vec<Tensor> {
         let _tmp: Vec<_> = grads.drain(1..).collect();
         let grad = grads.get(0).unwrap().clone();
         let grad_1 = grad.clone();
@@ -150,11 +151,11 @@ impl AddBackwardTensors {
         vec![grad_1, grad_2]
     }
 
-    pub fn set_next_edges(&mut self, edges: Vec<Edge>) {
+    fn set_next_edges(&mut self, edges: Vec<Edge>) {
         self.next_edges = Some(edges)
     }
 
-    pub fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
         let input_nr = self.input_metadata_.len();
         self.input_metadata_
             .push(InputMetaData::from_tensor(tensor));
@@ -179,7 +180,6 @@ impl AddBackwardTensors {
         self.next_edges.as_ref().unwrap().len()
     }
 }
-#[derive(Debug)]
 pub struct MulBackwardTensors {
     pub input_metadata_: SmallVec<[InputMetaData; 2]>,
     pub next_edges: Option<EdgeList>,
@@ -187,8 +187,8 @@ pub struct MulBackwardTensors {
     pub other: Option<SavedTensor>,
 }
 
-impl MulBackwardTensors {
-    pub fn call(&mut self, grads: Vec<Tensor>) -> Vec<Tensor> {
+impl NodeTrait for MulBackwardTensors {
+    fn call(&mut self, grads: Vec<Tensor>) -> Vec<Tensor> {
         let grad = grads.first().unwrap();
         let self_ = self._self.as_ref().unwrap().unpack();
         let other = self.other.as_ref().unwrap().unpack();
@@ -199,11 +199,11 @@ impl MulBackwardTensors {
         vec![first, second]
     }
 
-    pub fn set_next_edges(&mut self, edges: Vec<Edge>) {
+    fn set_next_edges(&mut self, edges: Vec<Edge>) {
         self.next_edges = Some(edges)
     }
 
-    pub fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
         let input_nr = self.input_metadata_.len();
         self.input_metadata_
             .push(InputMetaData::from_tensor(tensor));

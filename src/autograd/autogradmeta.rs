@@ -3,7 +3,6 @@ use crate::tensor::*;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
-#[derive(Debug)]
 pub struct AutogradMeta {
     pub grad_fn_: Option<Rc<RefCell<Node>>>,
     pub grad_accumulator_: Option<Weak<RefCell<Node>>>,
@@ -42,11 +41,13 @@ impl AutogradMeta {
     }
 
     pub fn grad_fn(&self) -> Option<Rc<RefCell<Node>>> {
-        if let Some(fn_) = self.grad_fn_.as_ref(){
+        if let Some(fn_) = self.grad_fn_.as_ref() {
             let clone = (*fn_).clone();
             Some(clone)
-            // todo!()
-        } else { None }
+        // todo!()
+        } else {
+            None
+        }
     }
 
     pub fn set_grad_fn(&mut self, grad_fn: Option<Rc<RefCell<Node>>>) {

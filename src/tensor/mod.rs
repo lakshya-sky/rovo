@@ -1,5 +1,5 @@
-mod tensor_impl;
 mod tensor;
+mod tensor_impl;
 
 pub use self::tensor::*;
 pub use self::tensor_impl::*;

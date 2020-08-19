@@ -5,7 +5,7 @@ use crate::util::TensorHook;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Tensor {
     pub _impl: Rc<RefCell<TensorImpl>>,
 }
@@ -138,7 +138,7 @@ impl Tensor {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Edge {
     pub function: Option<Rc<RefCell<Node>>>,
     pub input_nr: usize,
