@@ -78,4 +78,18 @@ mod test {
         println!("{}", t.grad().unwrap().as_ref()._impl.borrow().data);
         println!("{}", x.grad().unwrap().as_ref()._impl.borrow().data);
     }
+
+    #[test]
+    fn test_backward_sub_div() {
+        let t = Tensor::from_scalar(&[2, 2], 7.0, true);
+        let x = Tensor::from_scalar(&[2, 2], 3.0, true);
+        let div = &t / &x;
+        let sub = &x - &div;
+        backward(&vec![sub], &vec![], false);
+        // t.grad().unwrap();
+        println!("{}", t.grad().unwrap().as_ref()._impl.borrow().data);
+        println!("{}", x.grad().unwrap().as_ref()._impl.borrow().data);
+    }
+
+    
 }

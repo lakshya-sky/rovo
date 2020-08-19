@@ -45,6 +45,33 @@ impl SavedTensor {
         }
     }
 
+    pub fn new_consume(tensor: Tensor, is_output: bool) -> Self {
+        let was_default_constructed = false;
+        let output_nr = tensor.output_nr();
+        let requires_grad = tensor.requires_grad();
+        let has_grad_fn = !tensor.is_leaf();
+        let mut grad_accumulator: Option<Weak<RefCell<Node>>> = None;
+        let mut grad_fn = None;
+        if tensor.is_leaf() {
+            grad_accumulator = Some(Rc::downgrade(&util::grad_accumulator(&tensor)));
+        } else if !is_output {
+            grad_fn = tensor.grad_fn();
+        }
+        let version_counter = util::TensorHook::version_counter(&tensor).clone();
+        let saved_version = version_counter.current_version();
+        Self {
+            data: tensor,
+            grad_accumulator,
+            grad_fn,
+            saved_version,
+            output_nr,
+            was_default_constructed,
+            requires_grad,
+            has_grad_fn,
+            version_counter,
+        }
+    }
+
     pub fn unpack(&self) -> Tensor {
         if self.saved_version != self.version_counter.current_version() {
             panic!()

@@ -54,70 +54,6 @@ impl NodeTrait for AccumulateGrad {
     }
 }
 
-pub enum Function {
-    AddBackwardTensors(AddBackwardTensors),
-    MulBackwardTensors(MulBackwardTensors),
-    Add(Add),
-}
-
-impl Function {
-    fn call(&mut self, input: VariableList) -> VariableList {
-        match self {
-            Function::AddBackwardTensors(f) => f.call(input),
-            Function::Add(_) => todo!(),
-            Function::MulBackwardTensors(f) => f.call(input),
-        }
-    }
-
-    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
-        match self {
-            Function::AddBackwardTensors(f) => f.add_input_metadata(tensor),
-            Function::Add(_) => todo!(),
-            Function::MulBackwardTensors(f) => f.add_input_metadata(tensor),
-        }
-    }
-
-    fn set_next_edges(&mut self, edges: Vec<Edge>) {
-        match self {
-            Function::AddBackwardTensors(f) => f.set_next_edges(edges),
-            Function::Add(_) => {}
-            Function::MulBackwardTensors(f) => f.set_next_edges(edges),
-        }
-    }
-
-    fn next_edges(&self) -> Option<&EdgeList> {
-        match self {
-            Function::AddBackwardTensors(f) => f.next_edges(),
-            Function::Add(_) => todo!(),
-            Function::MulBackwardTensors(f) => f.next_edges(),
-        }
-    }
-
-    fn next_edge(&self, i: usize) -> Option<Edge> {
-        match self {
-            Function::AddBackwardTensors(f) => f.next_edge(i),
-            Function::Add(_) => todo!(),
-            Function::MulBackwardTensors(f) => f.next_edge(i),
-        }
-    }
-
-    fn num_inputs(&self) -> usize {
-        match self {
-            Function::AddBackwardTensors(t) => t.num_inputs(),
-            Function::Add(_) => todo!(),
-            Function::MulBackwardTensors(f) => f.num_inputs(),
-        }
-    }
-
-    fn num_outputs(&self) -> usize {
-        match self {
-            Function::AddBackwardTensors(f) => f.num_outputs(),
-            Function::Add(_) => todo!(),
-            Function::MulBackwardTensors(f) => f.num_outputs(),
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct Add;
 
@@ -135,7 +71,6 @@ impl InputMetaData {
         }
     }
 }
-
 
 pub struct AddBackwardTensors {
     pub input_metadata_: SmallVec<[InputMetaData; 2]>,
@@ -197,6 +132,140 @@ impl NodeTrait for MulBackwardTensors {
         let second = &self_ * grad;
 
         vec![first, second]
+    }
+
+    fn set_next_edges(&mut self, edges: Vec<Edge>) {
+        self.next_edges = Some(edges)
+    }
+
+    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+        let input_nr = self.input_metadata_.len();
+        self.input_metadata_
+            .push(InputMetaData::from_tensor(tensor));
+        input_nr
+    }
+
+    fn next_edges(&self) -> Option<&EdgeList> {
+        self.next_edges.as_ref()
+    }
+
+    fn next_edge(&self, i: usize) -> Option<Edge> {
+        let edges = self.next_edges.as_ref().unwrap();
+        let e = edges.get(i).and_then(|e| Some(e.clone()));
+        e
+    }
+
+    fn num_inputs(&self) -> usize {
+        self.input_metadata_.len()
+    }
+
+    fn num_outputs(&self) -> usize {
+        self.next_edges.as_ref().unwrap().len()
+    }
+}
+pub struct SubBackwardTensors {
+    pub input_metadata_: SmallVec<[InputMetaData; 2]>,
+    pub next_edges: Option<EdgeList>,
+}
+
+impl NodeTrait for SubBackwardTensors {
+    fn call(&mut self, mut grads: Vec<Tensor>) -> Vec<Tensor> {
+        let _tmp: Vec<_> = grads.drain(1..).collect();
+        let grad = grads.get(0).unwrap().clone();
+        let grad_1 = grad.clone();
+        let grad_2 = - &grad.clone();
+        vec![grad_1, grad_2]
+    }
+
+    fn set_next_edges(&mut self, edges: Vec<Edge>) {
+        self.next_edges = Some(edges)
+    }
+
+    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+        let input_nr = self.input_metadata_.len();
+        self.input_metadata_
+            .push(InputMetaData::from_tensor(tensor));
+        input_nr
+    }
+
+    fn next_edges(&self) -> Option<&EdgeList> {
+        self.next_edges.as_ref()
+    }
+
+    fn next_edge(&self, i: usize) -> Option<Edge> {
+        let edges = self.next_edges.as_ref().unwrap();
+        let e = edges.get(i).and_then(|e| Some(e.clone()));
+        e
+    }
+
+    fn num_inputs(&self) -> usize {
+        self.input_metadata_.len()
+    }
+
+    fn num_outputs(&self) -> usize {
+        self.next_edges.as_ref().unwrap().len()
+    }
+}
+
+pub struct DivBackwardTensors {
+    pub input_metadata_: SmallVec<[InputMetaData; 2]>,
+    pub next_edges: Option<EdgeList>,
+    pub _self: Option<SavedTensor>,
+    pub other: Option<SavedTensor>,
+}
+
+impl NodeTrait for DivBackwardTensors {
+    fn call(&mut self, grads: Vec<Tensor>) -> Vec<Tensor> {
+        let grad = grads.first().unwrap();
+        let self_ = self._self.as_ref().unwrap().unpack();
+        let other = self.other.as_ref().unwrap().unpack();
+
+        let first = grad / &other;
+        let second = -grad * &self_ / (&other * &other);
+
+        vec![first, second]
+    }
+
+    fn set_next_edges(&mut self, edges: Vec<Edge>) {
+        self.next_edges = Some(edges)
+    }
+
+    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+        let input_nr = self.input_metadata_.len();
+        self.input_metadata_
+            .push(InputMetaData::from_tensor(tensor));
+        input_nr
+    }
+
+    fn next_edges(&self) -> Option<&EdgeList> {
+        self.next_edges.as_ref()
+    }
+
+    fn next_edge(&self, i: usize) -> Option<Edge> {
+        let edges = self.next_edges.as_ref().unwrap();
+        let e = edges.get(i).and_then(|e| Some(e.clone()));
+        e
+    }
+
+    fn num_inputs(&self) -> usize {
+        self.input_metadata_.len()
+    }
+
+    fn num_outputs(&self) -> usize {
+        self.next_edges.as_ref().unwrap().len()
+    }
+}
+
+pub struct NegBackward {
+    pub input_metadata_: SmallVec<[InputMetaData; 2]>,
+    pub next_edges: Option<EdgeList>,
+}
+
+impl NodeTrait for NegBackward {
+    fn call(&mut self, input: Vec<Tensor>) -> Vec<Tensor> {
+        let grad_input = input.first().unwrap();
+        let grad_result = -grad_input;
+        vec![grad_result]
     }
 
     fn set_next_edges(&mut self, edges: Vec<Edge>) {
