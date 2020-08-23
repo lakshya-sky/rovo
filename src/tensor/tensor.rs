@@ -1,7 +1,8 @@
+use super::tensor_ops;
 use crate::autograd::*;
 use crate::ops::*;
 use crate::tensor::*;
-use crate::util::TensorHook;
+use crate::util_autograd::TensorHook;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -9,6 +10,8 @@ use std::rc::Rc;
 pub struct Tensor {
     pub _impl: Rc<RefCell<TensorImpl>>,
 }
+
+unsafe impl Send for Tensor {}
 
 impl Tensor {
     pub fn from_impl(_impl: TensorImpl) -> Tensor {
@@ -97,6 +100,10 @@ impl Tensor {
         self._impl.borrow().requires_grad()
     }
 
+    pub fn set_requires_grad(&self, requires_grad: bool) {
+        self._impl.borrow_mut().set_requires_grad(requires_grad);
+    }
+
     pub fn grad_fn(&self) -> Option<Rc<RefCell<Node>>> {
         let t = self._impl.borrow();
         if let Some(p) = t.autogradmeta.as_ref() {
@@ -126,15 +133,41 @@ impl Tensor {
         }
     }
 
+    pub fn dim(&self) -> i64 {
+        self.get_tensor_impl().dim()
+    }
+
     pub fn tensor_data(&self) -> Self {
         TensorHook::tensor_data(self)
     }
 
-    pub fn get_tensor_impl(&self) -> *mut TensorImpl {
+    pub fn get_tensor_impl(&self) -> &mut TensorImpl {
         let t = self._impl.as_ptr();
-        t
-        // todo!()
-        // self._impl.borrow_mut()
+        unsafe { &mut *t }
+    }
+
+    pub fn uniform(dims: &[usize], from: f64, to: f64) -> Tensor {
+        Self::from_impl(TensorImpl::uniform(dims, from, to))
+    }
+
+    pub fn randn(dims: &[usize]) -> Tensor {
+        Self::from_impl(TensorImpl::randn(dims))
+    }
+
+    pub fn t(&self) -> Tensor {
+        tensor_ops::t(self)
+    }
+
+    pub fn matmul(&self, other: &Tensor, consume:bool) -> Tensor {
+        super::linear_algebra::matmul(self, other, consume)
+    }
+
+    pub fn dot(&self, other: &Tensor) -> Tensor {
+        super::linear_algebra::dot(self, other)
+    }
+
+    pub fn mm(&self, other: &Tensor, consume:bool) -> Tensor {
+        super::tensor_ops::mm(self, other, consume)
     }
 }
 

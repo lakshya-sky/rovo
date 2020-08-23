@@ -45,12 +45,12 @@ impl TensorHook {
     }
 
     pub fn tensor_data(tensor: &Tensor) -> Tensor {
-        let tensor_impl_copy = unsafe { &*tensor.get_tensor_impl() }.shallow_copy();
+        let tensor_impl_copy = tensor.get_tensor_impl().shallow_copy();
         Tensor::from_impl(tensor_impl_copy)
     }
 
     pub fn version_counter(tensor: &Tensor) -> &TensorVersion {
-        unsafe { &*tensor.get_tensor_impl() }.version_counter()
+        tensor.get_tensor_impl().version_counter()
     }
 
     pub fn set_grad_accumulator(tensor: &Tensor, grad_accumulator: Option<Weak<RefCell<Node>>>) {
@@ -60,7 +60,7 @@ impl TensorHook {
 
     pub fn set_version_counter(tensor: &Tensor, version_counter: TensorVersion) {
         let impl_ = tensor.get_tensor_impl();
-        unsafe { &mut *impl_ }.set_version_counter(version_counter);
+        impl_.set_version_counter(version_counter);
     }
 }
 

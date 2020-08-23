@@ -56,15 +56,12 @@ impl Engine {
         inputs: InputBuffer,
     ) {
         let _fnc = func.as_ptr();
-        println!("Current Function: {:?}", _fnc);
         let outputs = Self::call_function(func.as_ptr(), inputs);
         let fn_ = func.borrow_mut();
         let num_outputs = outputs.len();
-        println!("Num_outputs: {}", num_outputs);
         let mut i = 0usize;
         let task = graph_task.borrow();
         let mut dependencies = task.dependencies.borrow_mut();
-        eprintln!("dependencies: {:?}", dependencies);
         loop {
             if i >= num_outputs {
                 break;
@@ -83,7 +80,6 @@ impl Engine {
             } else {
                 let count = it.unwrap();
                 *count -= 1;
-                eprintln!("Current Dependency: {:?} and count: {}", &t, count);
                 if *count == 0 {
                     let _ = dependencies.remove(&t);
                     is_ready = true;
@@ -94,10 +90,8 @@ impl Engine {
             let mut not_ready = task.not_ready_queue.borrow_mut();
 
             if let Some(input_buffer) = not_ready.get_mut(&t) {
-                eprintln!("Dependency {:?} exists in not_ready", &t);
                 input_buffer.add(next.input_nr, output);
                 if is_ready {
-                    println!("Pushing node from not_ready to ready queue");
                     queue.push(NodeTask::new(
                         Rc::downgrade(&graph_task.clone()),
                         next.function.as_ref().unwrap().clone(),
@@ -118,7 +112,6 @@ impl Engine {
                 // let outstanding_task = task.outstanding_tasks.as_ptr();
                 // unsafe { *outstanding_task = *outstanding_task + 1 };
                 } else {
-                    eprintln!("Inserting Node in not_ready_queue");
                     not_ready.insert(t, input_buffer);
                 }
             }
@@ -129,7 +122,6 @@ impl Engine {
     pub fn thread_main(&mut self, graph_task: &Rc<RefCell<GraphTask>>) {
         let graph_task = graph_task.borrow();
         loop {
-            eprintln!("Outstanding task: {}", graph_task.outstanding_tasks.get());
 
             let local_graph_task;
             {

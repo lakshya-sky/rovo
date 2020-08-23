@@ -1,10 +1,11 @@
+use super::tensor_util;
 use crate::autograd::*;
 use crate::ndarry_ext::*;
 use crate::ops::*;
 use crate::tensor::*;
+use ndarray_rand::{rand_distr, RandomExt};
 use std::cell::RefCell;
 use std::rc::Rc;
-
 #[derive(Default, Debug)]
 pub struct VersionCounter {
     pub version: u32,
@@ -57,30 +58,28 @@ pub struct TensorImpl {
 impl TensorImpl {
     pub fn from_scalar(shape: &[usize], scalar: f64, requires_grad: bool) -> TensorImpl {
         //Todo: this is weird because its what pytorch does.
-        let mut impl_ = TensorImpl {
-            data: NdArray::<f64>::from_elem(shape, scalar),
+        TensorImpl::new_from_array(NdArray::<f64>::from_elem(shape, scalar), requires_grad)
+    }
+
+    pub fn ones(shape: &[usize]) -> TensorImpl {
+        TensorImpl::new_from_array(NdArray::<f64>::ones(shape), false)
+    }
+
+    pub fn zeros(shape: &[usize]) -> TensorImpl {
+        TensorImpl::new_from_array(NdArray::<f64>::zeros(shape), false)
+    }
+
+    pub fn new_from_array(data: NdArray<f64>, requires_grad: bool) -> Self {
+        let mut _impl = Self {
+            data,
             autogradmeta: None,
             version_counter: TensorVersion::new(),
         };
 
         if requires_grad {
-            impl_.set_autograd_meta(Some(AutogradMeta::new_without_edge(&impl_, requires_grad)));
+            _impl.set_autograd_meta(Some(AutogradMeta::new_without_edge(&_impl, requires_grad)));
         }
-        impl_
-    }
-    pub fn ones(shape: &[usize]) -> TensorImpl {
-        TensorImpl {
-            data: NdArray::<f64>::ones(shape),
-            autogradmeta: None,
-            version_counter: TensorVersion::new(),
-        }
-    }
-    pub fn zeros(shape: &[usize]) -> TensorImpl {
-        TensorImpl {
-            data: NdArray::<f64>::zeros(shape),
-            autogradmeta: None,
-            version_counter: TensorVersion::new(),
-        }
+        _impl
     }
 
     pub fn grad(&self) -> Option<Rc<Tensor>> {
@@ -101,12 +100,25 @@ impl TensorImpl {
             false
         }
     }
+
+    pub fn set_requires_grad(&mut self, requires_grad: bool) {
+        if self.autogradmeta.is_none() {
+            self.autogradmeta = Some(AutogradMetaFactory::make());
+        }
+        self.autogradmeta
+            .as_mut()
+            .unwrap()
+            .set_requires_grad(requires_grad);
+    }
+
     pub fn get_autogradmeta(&mut self) -> Option<&mut AutogradMeta> {
         self.autogradmeta.as_mut()
     }
+
     pub fn set_autograd_meta(&mut self, t: Option<AutogradMeta>) {
         self.autogradmeta = t;
     }
+
     pub fn set_grad_fn(&mut self, t: Option<Rc<RefCell<Node>>>) {
         let meta = self.autogradmeta.as_mut().unwrap();
         meta.grad_fn_ = t;
@@ -135,5 +147,36 @@ impl TensorImpl {
 
     pub fn set_version_counter(&mut self, version_counter: TensorVersion) {
         self.version_counter = version_counter;
+    }
+
+    pub fn uniform(shape: &[usize], from: f64, to: f64) -> TensorImpl {
+        let uniform = NdArray::<f64>::random(shape, rand_distr::Uniform::new(from, to));
+        TensorImpl::new_from_array(uniform, false)
+    }
+
+    pub fn randn(shape: &[usize]) -> TensorImpl {
+        let uniform = NdArray::<f64>::random(shape, rand_distr::StandardNormal);
+        TensorImpl::new_from_array(uniform, false)
+    }
+
+    pub fn t(&self) -> Self {
+        self.transpose(0, if self.dim() < 2 { 0 } else { 1 })
+    }
+
+    pub fn transpose(&self, dim0: i64, dim1: i64) -> Self {
+        let ndims = self.dim();
+        let dim0 = tensor_util::maybe_wrap_dim(dim0, ndims, true);
+        let dim1 = tensor_util::maybe_wrap_dim(dim1, ndims, true);
+        let mut tr_data = self.data.clone();
+        tr_data.swap_axes(dim0, dim1);
+        Self::new_from_array(tr_data, false)
+    }
+
+    pub fn dim(&self) -> i64 {
+        self.data.ndim() as i64
+    }
+
+    pub fn bump_version(&self) {
+        self.version_counter.bump()
     }
 }

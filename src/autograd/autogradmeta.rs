@@ -56,6 +56,10 @@ impl AutogradMeta {
     pub fn set_output_nr(&mut self, output_nr: usize) {
         self.output_nr = output_nr;
     }
+
+    pub fn set_requires_grad(&mut self, requires_grad: bool) {
+        self.requires_grad = requires_grad
+    }
 }
 
 pub struct AutogradMetaFactory {}

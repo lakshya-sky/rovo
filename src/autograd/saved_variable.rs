@@ -1,6 +1,6 @@
 use crate::ops::*;
 use crate::tensor::*;
-use crate::util;
+use crate::util_autograd;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
@@ -26,11 +26,11 @@ impl SavedTensor {
         let mut grad_accumulator: Option<Weak<RefCell<Node>>> = None;
         let mut grad_fn = None;
         if tensor.is_leaf() {
-            grad_accumulator = Some(Rc::downgrade(&util::grad_accumulator(tensor)));
+            grad_accumulator = Some(Rc::downgrade(&util_autograd::grad_accumulator(tensor)));
         } else if !is_output {
             grad_fn = tensor.grad_fn();
         }
-        let version_counter = util::TensorHook::version_counter(tensor).clone();
+        let version_counter = util_autograd::TensorHook::version_counter(tensor).clone();
         let saved_version = version_counter.current_version();
         Self {
             data,
@@ -53,11 +53,11 @@ impl SavedTensor {
         let mut grad_accumulator: Option<Weak<RefCell<Node>>> = None;
         let mut grad_fn = None;
         if tensor.is_leaf() {
-            grad_accumulator = Some(Rc::downgrade(&util::grad_accumulator(&tensor)));
+            grad_accumulator = Some(Rc::downgrade(&util_autograd::grad_accumulator(&tensor)));
         } else if !is_output {
             grad_fn = tensor.grad_fn();
         }
-        let version_counter = util::TensorHook::version_counter(&tensor).clone();
+        let version_counter = util_autograd::TensorHook::version_counter(&tensor).clone();
         let saved_version = version_counter.current_version();
         Self {
             data: tensor,
@@ -87,7 +87,7 @@ impl SavedTensor {
             tensor = Tensor::make_variable_without_edge(self.data.clone(), self.requires_grad);
         }
 
-        util::TensorHook::set_version_counter(
+        util_autograd::TensorHook::set_version_counter(
             &tensor,
             TensorVersion::new_with_version(self.saved_version),
         );
@@ -100,7 +100,15 @@ impl SavedTensor {
             panic!()
         }
 
-        util::TensorHook::set_grad_accumulator(&mut tensor, self.grad_accumulator.clone());
+        util_autograd::TensorHook::set_grad_accumulator(&mut tensor, self.grad_accumulator.clone());
         tensor
+    }
+}
+
+impl std::fmt::Debug for SavedTensor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SavedTensor")
+            .field("data", &self.data)
+            .finish()
     }
 }

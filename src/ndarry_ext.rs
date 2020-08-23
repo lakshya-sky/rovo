@@ -59,6 +59,21 @@ pub fn add<T: Float>(input_1: NdArray<T>, input_2: NdArray<T>) -> NdArray<T> {
     input_1 + input_2
 }
 
+#[inline]
+pub fn into_dimensionality_ix2<T>(arr: NdArray<T>) -> ndarray::Array2<T> {
+    arr.into_dimensionality::<ndarray::Ix2>().unwrap()
+}
+
+pub fn dot<T>(arr1: &NdArray<T>, arr2: &NdArray<T>) -> NdArray<T>
+where
+    T: Float,
+{
+    let arr1_ = into_dimensionality_ix2(arr1.clone());
+    let arr2_ = into_dimensionality_ix2(arr2.clone());
+    let result = arr1_.dot(&arr2_) as ndarray::Array2<T>;
+    result.into_dyn()
+}
+
 #[cfg(test)]
 mod tests {
     use crate::ndarry_ext::*;

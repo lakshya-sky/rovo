@@ -28,28 +28,32 @@ impl Node {
     }
 }
 
-impl NodeTrait for Node {
-    fn call(&mut self, input: Vec<Tensor>) -> Vec<Tensor> {
+
+impl Node {
+    pub fn call(&mut self, input: Vec<Tensor>) -> Vec<Tensor> {
         self._impl.call(input)
     }
-
-    fn set_next_edges(&mut self, edges: Vec<Edge>) {
+    pub fn set_next_edges(&mut self, edges: Vec<Edge>) {
         self._impl.set_next_edges(edges)
     }
 
-    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+    pub fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
         self._impl.add_input_metadata(tensor)
     }
-    fn next_edges(&self) -> Option<&EdgeList> {
+
+    pub fn next_edges(&self) -> Option<&EdgeList> {
         self._impl.next_edges()
     }
-    fn next_edge(&self, i: usize) -> Option<Edge> {
+
+    pub fn next_edge(&self, i: usize) -> Option<Edge> {
         self._impl.next_edge(i)
     }
-    fn num_inputs(&self) -> usize {
+
+    pub fn num_inputs(&self) -> usize {
         self._impl.num_inputs()
     }
-    fn num_outputs(&self) -> usize {
+    
+    pub fn num_outputs(&self) -> usize {
         self._impl.num_outputs()
     }
 }

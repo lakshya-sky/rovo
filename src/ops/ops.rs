@@ -24,6 +24,10 @@ impl AccumulateGrad {
 
 impl NodeTrait for AccumulateGrad {
     fn call(&mut self, grads: Vec<Tensor>) -> Vec<Tensor> {
+        // println!(
+        //     "calling AccumulateGrad for Tensor: {:?}",
+        //     self.tensor
+        // );
         let new_grad = &grads[0];
         let grad = self.tensor.grad();
         if let Some(g) = grad {
@@ -163,6 +167,94 @@ impl NodeTrait for MulBackwardTensors {
         self.next_edges.as_ref().unwrap().len()
     }
 }
+pub struct AddBackwardScalar {
+    pub input_metadata_: SmallVec<[InputMetaData; 1]>,
+    pub next_edges: Option<EdgeList>,
+}
+
+impl NodeTrait for AddBackwardScalar {
+    fn call(&mut self, grads: Vec<Tensor>) -> Vec<Tensor> {
+        let grad = grads.first().unwrap();
+        vec![grad.clone()]
+    }
+
+    fn set_next_edges(&mut self, edges: Vec<Edge>) {
+        self.next_edges = Some(edges)
+    }
+
+    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+        let input_nr = self.input_metadata_.len();
+        self.input_metadata_
+            .push(InputMetaData::from_tensor(tensor));
+        input_nr
+    }
+
+    fn next_edges(&self) -> Option<&EdgeList> {
+        self.next_edges.as_ref()
+    }
+
+    fn next_edge(&self, i: usize) -> Option<Edge> {
+        let edges = self.next_edges.as_ref().unwrap();
+        let e = edges.get(i).and_then(|e| Some(e.clone()));
+        e
+    }
+
+    fn num_inputs(&self) -> usize {
+        self.input_metadata_.len()
+    }
+
+    fn num_outputs(&self) -> usize {
+        self.next_edges.as_ref().unwrap().len()
+    }
+}
+
+pub struct MulBackwardScalar {
+    pub input_metadata_: SmallVec<[InputMetaData; 1]>,
+    pub next_edges: Option<EdgeList>,
+    pub _self: Option<SavedTensor>,
+    pub other: f64,
+}
+
+impl NodeTrait for MulBackwardScalar {
+    fn call(&mut self, grads: Vec<Tensor>) -> Vec<Tensor> {
+        let grad = grads.first().unwrap();
+        let other = self.other;
+
+        let first = grad * other;
+
+        vec![first]
+    }
+
+    fn set_next_edges(&mut self, edges: Vec<Edge>) {
+        self.next_edges = Some(edges)
+    }
+
+    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+        let input_nr = self.input_metadata_.len();
+        self.input_metadata_
+            .push(InputMetaData::from_tensor(tensor));
+        input_nr
+    }
+
+    fn next_edges(&self) -> Option<&EdgeList> {
+        self.next_edges.as_ref()
+    }
+
+    fn next_edge(&self, i: usize) -> Option<Edge> {
+        let edges = self.next_edges.as_ref().unwrap();
+        let e = edges.get(i).and_then(|e| Some(e.clone()));
+        e
+    }
+
+    fn num_inputs(&self) -> usize {
+        self.input_metadata_.len()
+    }
+
+    fn num_outputs(&self) -> usize {
+        self.next_edges.as_ref().unwrap().len()
+    }
+}
+
 pub struct SubBackwardTensors {
     pub input_metadata_: SmallVec<[InputMetaData; 2]>,
     pub next_edges: Option<EdgeList>,
@@ -173,7 +265,7 @@ impl NodeTrait for SubBackwardTensors {
         let _tmp: Vec<_> = grads.drain(1..).collect();
         let grad = grads.get(0).unwrap().clone();
         let grad_1 = grad.clone();
-        let grad_2 = - &grad.clone();
+        let grad_2 = -&grad.clone();
         vec![grad_1, grad_2]
     }
 
@@ -295,5 +387,112 @@ impl NodeTrait for NegBackward {
 
     fn num_outputs(&self) -> usize {
         self.next_edges.as_ref().unwrap().len()
+    }
+}
+
+pub struct TBackward {
+    pub input_metadata_: SmallVec<[InputMetaData; 2]>,
+    pub next_edges: Option<EdgeList>,
+}
+
+impl NodeTrait for TBackward {
+    fn call(&mut self, input: Vec<Tensor>) -> Vec<Tensor> {
+        let grad_input = input.first().unwrap();
+        let grad_result = grad_input.t();
+        vec![grad_result]
+    }
+
+    fn set_next_edges(&mut self, edges: Vec<Edge>) {
+        self.next_edges = Some(edges)
+    }
+
+    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+        let input_nr = self.input_metadata_.len();
+        self.input_metadata_
+            .push(InputMetaData::from_tensor(tensor));
+        input_nr
+    }
+
+    fn next_edges(&self) -> Option<&EdgeList> {
+        self.next_edges.as_ref()
+    }
+
+    fn next_edge(&self, i: usize) -> Option<Edge> {
+        let edges = self.next_edges.as_ref().unwrap();
+        let e = edges.get(i).and_then(|e| Some(e.clone()));
+        e
+    }
+
+    fn num_inputs(&self) -> usize {
+        self.input_metadata_.len()
+    }
+
+    fn num_outputs(&self) -> usize {
+        self.next_edges.as_ref().unwrap().len()
+    }
+}
+
+impl std::fmt::Debug for TBackward {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "TBackward")
+    }
+}
+
+pub struct MmBackward {
+    pub input_metadata_: SmallVec<[InputMetaData; 2]>,
+    pub next_edges: Option<EdgeList>,
+    pub mat2_sizes: Vec<usize>,
+    pub self_: Option<SavedTensor>,
+    pub mat2_: Option<SavedTensor>,
+}
+
+impl NodeTrait for MmBackward {
+    fn call(&mut self, grads: Vec<Tensor>) -> Vec<Tensor> {
+        let grad = grads.first().unwrap();
+        let mat1 = self.self_.as_ref().unwrap().unpack();
+        let mat2 = self.mat2_.as_ref().unwrap().unpack();
+        //Todo: imlement and use mm_mat2_backward and mm_mat1_backward
+
+        // println!("Mat1: {:?}", mat1);
+        // println!("grad: {:?}", grad);
+        let mat2_grad = mat1.t().mm(grad, false);
+        let mat1_grad = grad.mm(&mat2.t(), false);
+        // println!("Mat 2 Grad: {:?}", mat2_grad);
+        vec![mat1_grad, mat2_grad]
+    }
+
+    fn set_next_edges(&mut self, edges: Vec<Edge>) {
+        self.next_edges = Some(edges)
+    }
+
+    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+        let input_nr = self.input_metadata_.len();
+        self.input_metadata_
+            .push(InputMetaData::from_tensor(tensor));
+        input_nr
+    }
+
+    fn next_edges(&self) -> Option<&EdgeList> {
+        self.next_edges.as_ref()
+    }
+
+    fn next_edge(&self, i: usize) -> Option<Edge> {
+        let edges = self.next_edges.as_ref().unwrap();
+        let e = edges.get(i).and_then(|e| Some(e.clone()));
+        e
+    }
+
+    fn num_inputs(&self) -> usize {
+        self.input_metadata_.len()
+    }
+
+    fn num_outputs(&self) -> usize {
+        self.next_edges.as_ref().unwrap().len()
+    }
+}
+
+impl std::fmt::Debug for MmBackward {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "MmBackward {:?}", self.mat2_)
     }
 }
