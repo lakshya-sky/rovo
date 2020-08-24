@@ -357,24 +357,3 @@ pub fn mm(mat1: &Tensor, mat2: &Tensor, consume: bool) -> Tensor {
     }
     result
 }
-
-#[cfg(test)]
-mod test {
-    use crate::tensor::Tensor;
-
-    #[test]
-    fn test_add_op() {
-        let t = Tensor::from_scalar(&[2, 2], 2.0, false);
-        let x = Tensor::from_scalar(&[2, 2], 1.0, false);
-        let res: Tensor = t + x;
-        println!("{}", res._impl.borrow().data);
-    }
-
-    #[test]
-    fn test_mul_op() {
-        let t = Tensor::from_scalar(&[2, 2], 3.0, true);
-        let x = Tensor::from_scalar(&[2, 2], 5.0, true);
-        let res: Tensor = &t * &x;
-        println!("{}", res._impl.borrow().data);
-    }
-}

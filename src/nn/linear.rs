@@ -57,13 +57,23 @@ mod test {
     use crate::tensor::Tensor;
 
     #[test]
-    fn it_works() {
+    fn linear_backward_test() {
         let config = LinearConfig::default();
         let linear = Linear::new(2, 1, config);
         let x = Tensor::from_scalar(&[2, 2], 2.0, true);
         let y = linear.forward(&x);
         backward::backward(&vec![y], &vec![], false);
-        println!("Input Teensor Grad {:?}", x.get_tensor_impl().grad());
-        println!("Linear Tensor Grad {:?}", linear.ws.get_tensor_impl().grad());
+        let ws_grad = linear.ws.get_tensor_impl().grad();
+        assert!(ws_grad.is_some());
+        assert!(ws_grad.as_ref().unwrap().get_tensor_impl().data.ndim() == 2);
+        let result = ws_grad
+            .unwrap()
+            .get_tensor_impl()
+            .data
+            .as_slice()
+            .unwrap()
+            .to_vec();
+        let expected = vec![4.0, 4.0];
+        assert_eq!(result, expected);
     }
 }
