@@ -76,6 +76,10 @@ impl Tensor {
         }
     }
 
+    // pub fn from_slice()->{
+
+    // }
+
     pub fn shape(&self) -> &[usize] {
         let t = self._impl.clone();
         let q = unsafe { &*t.as_ptr() };
@@ -158,7 +162,7 @@ impl Tensor {
         tensor_ops::t(self)
     }
 
-    pub fn matmul(&self, other: &Tensor, consume:bool) -> Tensor {
+    pub fn matmul(&self, other: &Tensor, consume: bool) -> Tensor {
         super::linear_algebra::matmul(self, other, consume)
     }
 
@@ -166,7 +170,7 @@ impl Tensor {
         super::linear_algebra::dot(self, other)
     }
 
-    pub fn mm(&self, other: &Tensor, consume:bool) -> Tensor {
+    pub fn mm(&self, other: &Tensor, consume: bool) -> Tensor {
         super::tensor_ops::mm(self, other, consume)
     }
 }

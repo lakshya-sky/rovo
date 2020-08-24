@@ -1,10 +1,10 @@
 use crate::tensor::*;
 
-pub trait Module: std::fmt::Debug + Send {
-    fn forward(&self, xs: &Tensor) -> Tensor;
+pub trait Module: std::fmt::Debug {
+    fn forward(&self, xs: &[&Tensor]) -> Tensor;
 }
 
-pub trait ModuleT: std::fmt::Debug + Send {
+pub trait ModuleT: std::fmt::Debug {
     fn forward_t(&self, xs: &Tensor, train: bool) -> Tensor;
 }
 
@@ -13,49 +13,13 @@ where
     T: Module,
 {
     fn forward_t(&self, xs: &Tensor, _train: bool) -> Tensor {
-        self.forward(&xs)
+        self.forward(&[xs])
     }
 }
 
-// struct Model{
-//     pub parameters: OrderedDict<String, Tensor>,
-//     buffers: OrderedDict<String, Tensor>,
-//     children: OrderedDict<String, Rc<RefCell<dyn Module>>>,
-//     name: Option<String>,
-//     is_training: bool
-// }
-
-// impl Default for Model{
-//     fn default() -> Self {
-//         Self{
-//             parameters: OrderedDict::new_with_key_description(String::from("Parameter")),
-//             buffers: OrderedDict::new_with_key_description(String::from("Buffer")),
-//             children: OrderedDict::new_with_key_description(String::from("children")),
-//             name: None,
-//             is_training: true
-//         }
-//     }
-// }
-
-// impl Model{
-//     pub fn new_with_name(name: String)->Self{
-//         Self{name: Some(name), ..Default::default()}
-//     }
-// }
-
-// impl Module for Model{
-//     fn name(&self) ->String {
-//         match &self.name {
-//             Some(n)=>n.clone(),
-//             // infername of the impl similar to C++ typeid().name().
-//             None=> String::from("Unnamed_Model"),
-//         }
-//     }
-// }
-
 impl Tensor {
     pub fn apply<M: Module>(&self, m: &M) -> Tensor {
-        m.forward(&self)
+        m.forward(&[self])
     }
 
     pub fn apply_t<M: ModuleT>(&self, m: &M, train: bool) -> Tensor {
@@ -64,7 +28,7 @@ impl Tensor {
 
     pub fn apply_opt<M: Module>(&self, m: &Option<M>) -> Tensor {
         match m {
-            Some(m) => m.forward(&self),
+            Some(m) => m.forward(&[self]),
             None => self.clone(),
         }
     }
@@ -77,8 +41,7 @@ impl Tensor {
     }
 }
 
-
-pub fn register_parameter(tensor: &Tensor, requires_grad: bool){
+pub fn register_parameter(tensor: &Tensor, requires_grad: bool) {
     tensor.set_requires_grad(requires_grad);
 }
 #[cfg(test)]

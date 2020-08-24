@@ -18,3 +18,7 @@ smallvec = "1.4.1"
 # see more at: https://github.com/rust-lang/rust/pull/38699
 [profile.dev]
 opt-level = 1
+
+
+[lib]
+# proc-macro = true

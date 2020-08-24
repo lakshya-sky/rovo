@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+#![feature(unboxed_closures)]
 mod autograd;
 mod binary_ops;
 mod core;

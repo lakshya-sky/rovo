@@ -496,3 +496,11 @@ impl std::fmt::Debug for MmBackward {
         writeln!(f, "MmBackward {:?}", self.mat2_)
     }
 }
+
+pub fn sigmoid(tensor: &Tensor) -> Tensor {
+    let data = tensor.get_tensor_impl().data.clone();
+    let data = data.mapv(f64::exp);
+    // e^x / 1 + e^x instead of 1/1+e^-x
+    let data = data.clone() / (1.0 + data);
+    Tensor::from_impl(TensorImpl::new_from_array(data, false))
+}

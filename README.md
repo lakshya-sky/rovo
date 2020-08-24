@@ -8,6 +8,7 @@ To-do:
 - [x] Impl -, /, and unary -.
 - [x] Basic Linear Layer.
 - [ ] function for comparing two tensors. (shallow_comapre that compares only data and shape)
+- [ ] basic Optimizer (SGD, Adam)
 - [ ] Impl OrderedDict similiar to python's.
 - [ ] Pow, Exp operators.
 - [ ] Improve Debug trait impls.

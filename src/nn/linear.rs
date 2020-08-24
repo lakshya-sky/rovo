@@ -44,8 +44,8 @@ impl Linear {
 }
 
 impl super::module::Module for Linear {
-    fn forward(&self, xs: &Tensor) -> Tensor {
-        &xs.matmul(&self.ws.t(), true) + &self.bs
+    fn forward(&self, xs: &[&Tensor]) -> Tensor {
+        &xs[0].matmul(&self.ws.t(), true) + &self.bs
     }
 }
 
@@ -61,7 +61,7 @@ mod test {
         let config = LinearConfig::default();
         let linear = Linear::new(2, 1, config);
         let x = Tensor::from_scalar(&[2, 2], 2.0, true);
-        let y = linear.forward(&x);
+        let y = linear.forward(&[&x]);
         backward::backward(&vec![y], &vec![], false);
         let ws_grad = linear.ws.get_tensor_impl().grad();
         assert!(ws_grad.is_some());
