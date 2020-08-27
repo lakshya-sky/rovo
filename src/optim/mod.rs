@@ -65,17 +65,20 @@ mod test {
     use super::{Optimizer, SGD};
     use crate::autograd::backward;
     use crate::nn::Module;
-    use crate::nn::{Linear, LinearConfig};
+    use crate::nn::{Functional, Linear, LinearConfig};
     use crate::tensor::Tensor;
 
     #[test]
     fn test_sgd_step() {
         let config = LinearConfig::default();
         let linear = Linear::new(2, 1, config);
+        let sigmoid = Functional::new(Functional::sigmoid());
         let mut sgd = SGD::new(linear.parameters());
         let x = Tensor::from_scalar(&[2, 2], 2.0, true);
         let y = linear.forward(&[&x]);
-        backward::backward(&vec![y], &vec![], false);
+        let result = sigmoid.forward(&[&y]);
+        println!("Result: {:?}", result);
+        backward::backward(&vec![result], &vec![], false);
         {
             println!("Weights Before step: {:?}", linear.parameters());
         }

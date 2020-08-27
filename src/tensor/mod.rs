@@ -6,6 +6,7 @@ mod tensor_util;
 
 pub use self::tensor::*;
 pub use self::tensor_impl::*;
+pub use self::tensor_ops::*;
 pub type VariableList = Vec<Tensor>;
 pub type EdgeList = Vec<Edge>;
 

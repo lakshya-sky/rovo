@@ -376,6 +376,31 @@ pub fn sum(self_: &Tensor, dims: Option<&[usize]>, keep_dim: bool) -> Tensor {
     if grad_fn.is_some() {
         util_autograd::set_history(&result, grad_fn.unwrap());
     }
-    
+
+    result
+}
+
+pub fn sigmoid(tensor: &Tensor) -> Tensor {
+    let data = tensor.get_tensor_impl().data.clone();
+    let data = data.mapv(f64::exp);
+    // e^x / 1 + e^x instead of 1/1+e^-x
+    let data = data.clone() / (1.0 + data);
+    let result = Tensor::from_impl(TensorImpl::new_from_array(data, false));
+
+    let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
+    if util_autograd::compute_requires_grad(&[tensor]) {
+        let mut _grad_fn = SigmoidBackward {
+            next_edges: None,
+            input_metadata_: smallvec::smallvec![],
+            result_: None,
+        };
+        _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[tensor]));
+        _grad_fn.result_ = Some(SavedTensor::new(tensor, true));
+        grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
+    }
+
+    if grad_fn.is_some() {
+        util_autograd::set_history(&result, grad_fn.unwrap());
+    }
     result
 }

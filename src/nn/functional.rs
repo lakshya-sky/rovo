@@ -1,4 +1,4 @@
-use crate::tensor::Tensor;
+use crate::tensor::{sigmoid, Tensor};
 
 pub struct Functional {
     fn_: Box<dyn Fn(&[&Tensor]) -> Tensor>,
@@ -16,7 +16,7 @@ impl Functional {
     }
 
     pub fn sigmoid() -> Box<dyn Fn(&[&Tensor]) -> Tensor> {
-        Box::new(|t: &[&Tensor]| crate::ops::sigmoid(t[0]))
+        Box::new(|t: &[&Tensor]| sigmoid(t[0]))
     }
 }
 

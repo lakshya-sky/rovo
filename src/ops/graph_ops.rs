@@ -531,8 +531,8 @@ impl NodeTrait for MmBackward {
         // println!("grad: {:?}", grad);
         let mat2_grad = mat1.t().mm(grad, false);
         let mat1_grad = grad.mm(&mat2.t(), false);
-        println!("Mat 2 Grad: {:?}", mat2_grad);
-        println!("Mat 1 Grad: {:?}", mat1_grad);
+        // println!("Mat 2 Grad: {:?}", mat2_grad);
+        // println!("Mat 1 Grad: {:?}", mat1_grad);
         vec![mat1_grad, mat2_grad]
     }
 
@@ -574,16 +574,54 @@ impl NodeTrait for MmBackward {
     }
 }
 
-impl std::fmt::Debug for MmBackward {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "MmBackward {:?}", self.mat2_)
-    }
+pub struct SigmoidBackward {
+    pub input_metadata_: SmallVec<[InputMetaData; 2]>,
+    pub next_edges: Option<EdgeList>,
+    pub result_: Option<SavedTensor>,
 }
 
-pub fn sigmoid(tensor: &Tensor) -> Tensor {
-    let data = tensor.get_tensor_impl().data.clone();
-    let data = data.mapv(f64::exp);
-    // e^x / 1 + e^x instead of 1/1+e^-x
-    let data = data.clone() / (1.0 + data);
-    Tensor::from_impl(TensorImpl::new_from_array(data, false))
+impl NodeTrait for SigmoidBackward {
+    fn call(&mut self, input: Vec<Tensor>) -> Vec<Tensor> {
+        let grad_input = input.first().unwrap();
+        let result = self.result_.as_ref().unwrap().unpack();
+        let grad_result = (-&result + 1.0)*&result*grad_input;
+        vec![grad_result]
+    }
+
+    fn set_next_edges(&mut self, edges: Vec<Edge>) {
+        self.next_edges = Some(edges)
+    }
+
+    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+        let input_nr = self.input_metadata_.len();
+        self.input_metadata_
+            .push(InputMetaData::from_tensor(tensor));
+        input_nr
+    }
+
+    fn next_edges(&self) -> Option<&EdgeList> {
+        self.next_edges.as_ref()
+    }
+
+    fn next_edge(&self, i: usize) -> Option<Edge> {
+        let edges = self.next_edges.as_ref().unwrap();
+        let e = edges.get(i).and_then(|e| Some(e.clone()));
+        e
+    }
+
+    fn num_inputs(&self) -> usize {
+        self.input_metadata_.len()
+    }
+
+    fn num_outputs(&self) -> usize {
+        self.next_edges.as_ref().unwrap().len()
+    }
+
+    fn input_metadata(&self, index: usize) -> &InputMetaData {
+        self.input_metadata_.get(index).unwrap()
+    }
+
+    fn debug_print(&self) -> String {
+        "SigmoidBackward".to_string()
+    }
 }

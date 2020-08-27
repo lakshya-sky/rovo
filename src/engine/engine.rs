@@ -56,12 +56,12 @@ impl Engine {
             let mut new_grads = Vec::with_capacity(grads.len());
             let mut i = 0;
             let grad_len = grads.len();
-            println!("Grads Length: {}", grads.len());
+            // println!("Grads Length: {}", grads.len());
             loop {
                 if i >= grad_len {
                     break;
                 }
-                println!("Index : {}", i);
+                // println!("Index : {}", i);
                 let edge = edges.get(i).unwrap();
                 let function = edge.function().unwrap().borrow();
                 let metadata = function.input_metadata(edge.input_nr);
