@@ -26,6 +26,14 @@ impl Tensor {
         }
     }
 
+    pub fn move_tensor(&self, other: Tensor) {
+        let impl_ = Rc::try_unwrap(other._impl);
+        if let Ok(impl_) = impl_ {
+            let tensor_impl = impl_.into_inner();
+            self._impl.replace(tensor_impl);
+        }
+    }
+
     pub fn make_variable(other: Tensor, gradient_edge: Edge) -> Self {
         let mut other_impl_copy = other._impl.borrow().shallow_copy();
         other_impl_copy.set_autograd_meta(Some(AutogradMeta::new(
@@ -92,7 +100,7 @@ impl Tensor {
         }
     }
 
-    pub fn grad(&self) -> Option<Rc<Tensor>> {
+    pub fn grad(&self) -> Option<Rc<RefCell<Tensor>>> {
         self._impl.borrow().grad()
     }
 
@@ -141,6 +149,9 @@ impl Tensor {
         self.get_tensor_impl().dim()
     }
 
+    pub fn sizes(&self) -> &[usize] {
+        self.get_tensor_impl().sizes()
+    }
     pub fn tensor_data(&self) -> Self {
         TensorHook::tensor_data(self)
     }
@@ -163,6 +174,7 @@ impl Tensor {
     }
 
     pub fn matmul(&self, other: &Tensor, consume: bool) -> Tensor {
+        // println!("Matmul Shapes: {:?} and {:?}", self.sizes(), other.sizes());
         super::linear_algebra::matmul(self, other, consume)
     }
 
@@ -172,6 +184,21 @@ impl Tensor {
 
     pub fn mm(&self, other: &Tensor, consume: bool) -> Tensor {
         super::tensor_ops::mm(self, other, consume)
+    }
+
+    pub fn add_(&self, other: &Tensor, scalar: f64) {
+        let data =
+            self.get_tensor_impl().data.clone() + other.get_tensor_impl().data.clone() * scalar;
+
+        self.get_tensor_impl().data = data;
+    }
+
+    pub fn sum(&self) -> Self {
+        tensor_ops::sum(self, None, false)
+    }
+
+    pub fn sum_dim(&self, dims: &[usize], keep_dim: bool) -> Tensor {
+        tensor_ops::sum(self, Some(dims), keep_dim)
     }
 }
 
@@ -196,6 +223,10 @@ impl Edge {
             function: q,
             input_nr,
         }
+    }
+
+    pub fn function(&self) -> Option<&Rc<RefCell<Node>>> {
+        self.function.as_ref()
     }
 }
 #[cfg(test)]

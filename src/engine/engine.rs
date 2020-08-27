@@ -1,6 +1,7 @@
 use super::task::*;
 use crate::core::AutoGradMode;
 use crate::ops::*;
+use crate::util;
 use crate::{ops::Node, tensor::*};
 use std::cell::RefCell;
 use std::collections::HashSet;
@@ -43,10 +44,51 @@ impl Engine {
         }
     }
 
+    pub fn evaluate_outputs(edges: Option<&Vec<Edge>>, mut grads: VariableList) -> VariableList {
+        if let Some(edges) = edges {
+            if edges.len() != grads.len() {
+                panic!(format!(
+                    "Invalid number of gradients - expected {}, but got {}",
+                    edges.len(),
+                    grads.len()
+                ))
+            }
+            let mut new_grads = Vec::with_capacity(grads.len());
+            let mut i = 0;
+            let grad_len = grads.len();
+            println!("Grads Length: {}", grads.len());
+            loop {
+                if i >= grad_len {
+                    break;
+                }
+                println!("Index : {}", i);
+                let edge = edges.get(i).unwrap();
+                let function = edge.function().unwrap().borrow();
+                let metadata = function.input_metadata(edge.input_nr);
+                // remove shrinks vector that's why can't use i so use 0 to always get first element.
+                let grad = grads.remove(0);
+                if grad.sizes() != metadata.shape() {
+                    if !util::is_expandable_to(metadata.shape(), grad.sizes()) {
+                        panic!(format!("invalid gradient at index {} - got {:?}, but expected shape comapatible with {:?}", i, grad.sizes(), metadata.shape()));
+                    }
+                    new_grads.push(util::sum_to(grad, metadata.shape()))
+                } else {
+                    new_grads.push(grad);
+                }
+                i += 1;
+            }
+            new_grads
+        } else {
+            grads
+        }
+    }
+
     pub fn call_function(func: *mut Node, inputs: InputBuffer) -> VariableList {
         let inputs = InputBuffer::variables(inputs);
-        let outputs = unsafe { &mut *func }.call(inputs);
-        outputs
+        let fn_ = unsafe { &mut *func };
+        println!("Calling {:?}", fn_._impl);
+        let outputs = fn_.call(inputs);
+        Self::evaluate_outputs(fn_.next_edges(), outputs)
     }
 
     pub fn evaluate_function(
@@ -122,7 +164,6 @@ impl Engine {
     pub fn thread_main(&mut self, graph_task: &Rc<RefCell<GraphTask>>) {
         let graph_task = graph_task.borrow();
         loop {
-
             let local_graph_task;
             {
                 let task = self.local_ready_queue.borrow_mut().pop();

@@ -6,7 +6,7 @@ use std::rc::{Rc, Weak};
 pub struct AutogradMeta {
     pub grad_fn_: Option<Rc<RefCell<Node>>>,
     pub grad_accumulator_: Option<Weak<RefCell<Node>>>,
-    pub grad_: Option<Rc<Tensor>>,
+    pub grad_: Option<Rc<RefCell<Tensor>>>,
     pub requires_grad: bool,
     pub output_nr: usize,
 }
@@ -29,11 +29,11 @@ impl AutogradMeta {
         let edge = Edge::empty();
         Self::new(impl_, requires_grad, edge)
     }
-    pub fn grad(&self) -> Option<Rc<Tensor>> {
+    pub fn grad(&self) -> Option<Rc<RefCell<Tensor>>> {
         self.grad_.clone()
     }
     pub fn set_grad(&mut self, grad: Tensor) {
-        self.grad_ = Some(Rc::new(grad))
+        self.grad_ = Some(Rc::new(RefCell::new(grad)))
     }
 
     pub fn requires_grad(&self) -> bool {

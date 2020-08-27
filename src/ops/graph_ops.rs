@@ -2,7 +2,6 @@ use crate::autograd::SavedTensor;
 use crate::ops::NodeTrait;
 use crate::tensor::*;
 use smallvec::*;
-use std::rc::Rc;
 
 pub struct AccumulateGrad {
     tensor: Tensor,
@@ -31,8 +30,8 @@ impl NodeTrait for AccumulateGrad {
         let new_grad = &grads[0];
         let grad = self.tensor.grad();
         if let Some(g) = grad {
-            let t = unsafe { &*Rc::into_raw(g) };
-            self.tensor.set_grad(t + new_grad);
+            let t = g.borrow().clone();
+            self.tensor.set_grad(&t + new_grad);
         } else {
             let t = Tensor::new(new_grad);
             self.tensor.set_grad(t);
@@ -56,6 +55,14 @@ impl NodeTrait for AccumulateGrad {
     fn num_outputs(&self) -> usize {
         todo!()
     }
+
+    fn input_metadata(&self, index: usize) -> &InputMetaData {
+        self.input_metadata_.get(index).unwrap()
+    }
+
+    fn debug_print(&self) -> String {
+        "Accumulate_Grad".to_string()
+    }
 }
 
 #[derive(Debug)]
@@ -63,16 +70,20 @@ pub struct Add;
 
 #[derive(Debug)]
 pub struct InputMetaData {
-    pub size: SmallVec<[usize; 4]>,
+    pub size: SmallVec<[usize; 5]>,
     pub device: usize,
 }
 
 impl InputMetaData {
-    fn from_tensor(_t: &Tensor) -> InputMetaData {
+    fn from_tensor(t: &Tensor) -> InputMetaData {
         InputMetaData {
-            size: SmallVec::<[usize; 4]>::new(),
+            size: SmallVec::from_slice(t.sizes()),
             device: 0,
         }
+    }
+
+    pub fn shape(&self) -> &[usize] {
+        self.size.as_slice()
     }
 }
 
@@ -117,6 +128,13 @@ impl NodeTrait for AddBackwardTensors {
 
     fn num_outputs(&self) -> usize {
         self.next_edges.as_ref().unwrap().len()
+    }
+
+    fn input_metadata(&self, index: usize) -> &InputMetaData {
+        self.input_metadata_.get(index).unwrap()
+    }
+    fn debug_print(&self) -> String {
+        "AddBackwardTensors".to_string()
     }
 }
 pub struct MulBackwardTensors {
@@ -166,6 +184,14 @@ impl NodeTrait for MulBackwardTensors {
     fn num_outputs(&self) -> usize {
         self.next_edges.as_ref().unwrap().len()
     }
+
+    fn input_metadata(&self, index: usize) -> &InputMetaData {
+        self.input_metadata_.get(index).unwrap()
+    }
+
+    fn debug_print(&self) -> String {
+        "MulBackwardTensors".to_string()
+    }
 }
 pub struct AddBackwardScalar {
     pub input_metadata_: SmallVec<[InputMetaData; 1]>,
@@ -205,6 +231,14 @@ impl NodeTrait for AddBackwardScalar {
 
     fn num_outputs(&self) -> usize {
         self.next_edges.as_ref().unwrap().len()
+    }
+
+    fn input_metadata(&self, index: usize) -> &InputMetaData {
+        self.input_metadata_.get(index).unwrap()
+    }
+
+    fn debug_print(&self) -> String {
+        "AddBackwardScalar".to_string()
     }
 }
 
@@ -253,6 +287,14 @@ impl NodeTrait for MulBackwardScalar {
     fn num_outputs(&self) -> usize {
         self.next_edges.as_ref().unwrap().len()
     }
+
+    fn input_metadata(&self, index: usize) -> &InputMetaData {
+        self.input_metadata_.get(index).unwrap()
+    }
+
+    fn debug_print(&self) -> String {
+        "MulBackwardScalar".to_string()
+    }
 }
 
 pub struct SubBackwardTensors {
@@ -296,6 +338,14 @@ impl NodeTrait for SubBackwardTensors {
 
     fn num_outputs(&self) -> usize {
         self.next_edges.as_ref().unwrap().len()
+    }
+
+    fn input_metadata(&self, index: usize) -> &InputMetaData {
+        self.input_metadata_.get(index).unwrap()
+    }
+
+    fn debug_print(&self) -> String {
+        "SubBackwardTensors".to_string()
     }
 }
 
@@ -346,6 +396,14 @@ impl NodeTrait for DivBackwardTensors {
     fn num_outputs(&self) -> usize {
         self.next_edges.as_ref().unwrap().len()
     }
+
+    fn input_metadata(&self, index: usize) -> &InputMetaData {
+        self.input_metadata_.get(index).unwrap()
+    }
+
+    fn debug_print(&self) -> String {
+        "DivBackwardTensors".to_string()
+    }
 }
 
 pub struct NegBackward {
@@ -387,6 +445,14 @@ impl NodeTrait for NegBackward {
 
     fn num_outputs(&self) -> usize {
         self.next_edges.as_ref().unwrap().len()
+    }
+
+    fn input_metadata(&self, index: usize) -> &InputMetaData {
+        self.input_metadata_.get(index).unwrap()
+    }
+
+    fn debug_print(&self) -> String {
+        "NegBackward".to_string()
     }
 }
 
@@ -430,6 +496,14 @@ impl NodeTrait for TBackward {
     fn num_outputs(&self) -> usize {
         self.next_edges.as_ref().unwrap().len()
     }
+
+    fn input_metadata(&self, index: usize) -> &InputMetaData {
+        self.input_metadata_.get(index).unwrap()
+    }
+
+    fn debug_print(&self) -> String {
+        "TBackward".to_string()
+    }
 }
 
 impl std::fmt::Debug for TBackward {
@@ -457,7 +531,8 @@ impl NodeTrait for MmBackward {
         // println!("grad: {:?}", grad);
         let mat2_grad = mat1.t().mm(grad, false);
         let mat1_grad = grad.mm(&mat2.t(), false);
-        // println!("Mat 2 Grad: {:?}", mat2_grad);
+        println!("Mat 2 Grad: {:?}", mat2_grad);
+        println!("Mat 1 Grad: {:?}", mat1_grad);
         vec![mat1_grad, mat2_grad]
     }
 
@@ -488,6 +563,14 @@ impl NodeTrait for MmBackward {
 
     fn num_outputs(&self) -> usize {
         self.next_edges.as_ref().unwrap().len()
+    }
+
+    fn input_metadata(&self, index: usize) -> &InputMetaData {
+        self.input_metadata_.get(index).unwrap()
+    }
+
+    fn debug_print(&self) -> String {
+        "MmBackward".to_string()
     }
 }
 

@@ -10,3 +10,4 @@ mod ops;
 mod tensor;
 mod util;
 mod util_autograd;
+mod optim;

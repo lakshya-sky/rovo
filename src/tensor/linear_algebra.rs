@@ -41,3 +41,15 @@ pub fn mm_consume(_tensor1: &Tensor, _tensor2: Tensor) -> Tensor {
     let result = ndarry_ext::dot(&mat1.data, &mat2.data);
     Tensor::from_impl(TensorImpl::new_from_array(result, false))
 }
+
+pub fn sum(self_: &Tensor, dims: Option<&[usize]>, _keep_dim: bool) -> Tensor {
+    let mut data = self_.get_tensor_impl().data.clone();
+    if let Some(dims) = dims {
+        for dim in dims {
+            data = data.sum_axis(ndarray::Axis(*dim));
+        }
+    } else {
+        data = ndarray::arr0(data.sum()).into_dyn();
+    }
+    Tensor::from_impl(TensorImpl::new_from_array(data, false))
+}

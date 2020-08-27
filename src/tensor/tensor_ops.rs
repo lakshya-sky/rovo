@@ -21,6 +21,8 @@ impl Add<Self> for Tensor {
                 .borrow_mut()
                 .set_next_edges(util_autograd::collect_next_edges(&[&self, &rhs]));
         }
+        println!("LHS: {:?}", &self._impl.borrow().data);
+        println!("RHS: {:?}", &rhs._impl.borrow().data);
         let result = &self._impl.borrow().data + &rhs._impl.borrow().data;
         let _impl = TensorImpl {
             data: result,
@@ -355,5 +357,25 @@ pub fn mm(mat1: &Tensor, mat2: &Tensor, consume: bool) -> Tensor {
     if grad_fn.is_some() {
         util_autograd::set_history(&result, grad_fn.unwrap());
     }
+    result
+}
+
+pub fn sum(self_: &Tensor, dims: Option<&[usize]>, keep_dim: bool) -> Tensor {
+    let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
+    if util_autograd::compute_requires_grad(&[self_]) {
+        let mut _grad_fn = AddBackwardTensors {
+            next_edges: None,
+            input_metadata_: smallvec::smallvec![],
+        };
+        _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[self_]));
+        grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
+    }
+
+    let result = super::linear_algebra::sum(self_, dims, keep_dim);
+
+    if grad_fn.is_some() {
+        util_autograd::set_history(&result, grad_fn.unwrap());
+    }
+    
     result
 }

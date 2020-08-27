@@ -32,3 +32,15 @@ impl GradMode {
         unsafe { GRADMODE_ENABLED = enabled }
     }
 }
+
+pub struct NoGradGuard {
+    mode: AutoGradMode,
+}
+
+impl Default for NoGradGuard {
+    fn default() -> Self {
+        Self {
+            mode: AutoGradMode::new(false),
+        }
+    }
+}

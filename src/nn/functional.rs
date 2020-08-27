@@ -24,18 +24,22 @@ impl super::Module for Functional {
     fn forward(&self, xs: &[&Tensor]) -> Tensor {
         (self.fn_)(xs)
     }
+
+    fn parameters(&self) -> Vec<Tensor> {
+        todo!()
+    }
 }
 
 #[cfg(test)]
 mod test {
+    use super::super::Module;
     use super::Functional;
     use crate::tensor::Tensor;
-    use super::super::Module;
     #[test]
     fn test_functional_sigmoid() {
         let sigmoid = Functional::sigmoid();
         let f = Functional::new(sigmoid);
-        let x = Tensor::from_scalar(&[3,3], 2.0, false);
+        let x = Tensor::from_scalar(&[3, 3], 2.0, false);
         let result = f.forward(&[&x]);
         println!("Result from Functional Layer with Sigmoid: {:?}", result);
     }

@@ -12,6 +12,9 @@ To-do:
 - [ ] Impl OrderedDict similiar to python's.
 - [ ] Pow, Exp operators.
 - [ ] Improve Debug trait impls.
+- [ ] Improve sum() & view() methods.
+- [ ] Use queue for evaluate_outputs.
+
 
 Corner-cases:
 

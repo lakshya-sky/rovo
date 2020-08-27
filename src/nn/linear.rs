@@ -47,6 +47,10 @@ impl super::module::Module for Linear {
     fn forward(&self, xs: &[&Tensor]) -> Tensor {
         &xs[0].matmul(&self.ws.t(), true) + &self.bs
     }
+
+    fn parameters(&self) -> Vec<Tensor> {
+        vec![self.ws.clone(), self.bs.clone()]
+    }
 }
 
 #[cfg(test)]
@@ -65,9 +69,19 @@ mod test {
         backward::backward(&vec![y], &vec![], false);
         let ws_grad = linear.ws.get_tensor_impl().grad();
         assert!(ws_grad.is_some());
-        assert!(ws_grad.as_ref().unwrap().get_tensor_impl().data.ndim() == 2);
+        assert!(
+            ws_grad
+                .as_ref()
+                .unwrap()
+                .borrow()
+                .get_tensor_impl()
+                .data
+                .ndim()
+                == 2
+        );
         let result = ws_grad
             .unwrap()
+            .borrow()
             .get_tensor_impl()
             .data
             .as_slice()

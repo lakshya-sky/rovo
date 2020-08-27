@@ -82,7 +82,7 @@ impl TensorImpl {
         _impl
     }
 
-    pub fn grad(&self) -> Option<Rc<Tensor>> {
+    pub fn grad(&self) -> Option<Rc<RefCell<Tensor>>> {
         self.autogradmeta.as_ref().unwrap().grad()
     }
 
@@ -176,6 +176,9 @@ impl TensorImpl {
         self.data.ndim() as i64
     }
 
+    pub fn sizes(&self) -> &[usize] {
+        self.data.shape()
+    }
     pub fn bump_version(&self) {
         self.version_counter.bump()
     }

@@ -52,7 +52,7 @@ mod test {
 
         backward(&vec![res], &vec![], false);
         // t.grad().unwrap();
-        println!("{}", t.grad().unwrap().as_ref()._impl.borrow().data);
+        println!("{:?}", t.grad().unwrap().as_ref());
         // println!("{}", x.grad().unwrap().as_ref()._impl.borrow().data);
     }
     #[test]
@@ -63,8 +63,8 @@ mod test {
 
         backward(&vec![res], &vec![], false);
         // t.grad().unwrap();
-        println!("{}", t.grad().unwrap().as_ref()._impl.borrow().data);
-        println!("{}", x.grad().unwrap().as_ref()._impl.borrow().data);
+        println!("{:?}", t.grad().unwrap().as_ref());
+        println!("{:?}", x.grad().unwrap().as_ref());
     }
 
     #[test]
@@ -75,8 +75,8 @@ mod test {
         let mul = &x * &add;
         backward(&vec![mul], &vec![], false);
         // t.grad().unwrap();
-        println!("{}", t.grad().unwrap().as_ref()._impl.borrow().data);
-        println!("{}", x.grad().unwrap().as_ref()._impl.borrow().data);
+        println!("{:?}", t.grad().unwrap().as_ref());
+        println!("{:?}", x.grad().unwrap().as_ref());
     }
 
     #[test]
@@ -87,8 +87,8 @@ mod test {
         let sub = &x - &div;
         backward(&vec![sub], &vec![], false);
         // t.grad().unwrap();
-        println!("{}", t.grad().unwrap().as_ref()._impl.borrow().data);
-        println!("{}", x.grad().unwrap().as_ref()._impl.borrow().data);
+        println!("{:?}", t.grad().unwrap().as_ref());
+        println!("{:?}", x.grad().unwrap().as_ref());
     }
 
     #[test]
@@ -98,8 +98,8 @@ mod test {
         let result = x.mm(&w, true);
         backward(&vec![result], &vec![], false);
         // t.grad().unwrap();
-        println!("{}", x.grad().unwrap().as_ref()._impl.borrow().data);
-        println!("{}", w.grad().unwrap().as_ref()._impl.borrow().data);
+        println!("{:?}", x.grad().unwrap().as_ref());
+        println!("{:?}", w.grad().unwrap().as_ref());
     }
 
     #[test]
@@ -110,7 +110,7 @@ mod test {
         let result = x.matmul(&w.t(), true) + b;
         backward(&vec![result], &vec![], false);
         // t.grad().unwrap();
-        println!("{}", x.grad().unwrap().as_ref()._impl.borrow().data);
-        println!("{}", w.grad().unwrap().as_ref()._impl.borrow().data);
+        println!("{:?}", x.grad().unwrap().as_ref());
+        println!("{:?}", w.grad().unwrap().as_ref());
     }
 }

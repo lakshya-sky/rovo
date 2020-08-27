@@ -13,6 +13,7 @@ impl GraphRoot {
         }
     }
 }
+
 impl NodeTrait for GraphRoot {
     fn call(&mut self, _input: VariableList) -> VariableList {
         // self.outputs
@@ -45,5 +46,13 @@ impl NodeTrait for GraphRoot {
 
     fn num_outputs(&self) -> usize {
         todo!()
+    }
+
+    fn input_metadata(&self, _index: usize) -> &super::InputMetaData {
+        todo!()
+    }
+
+    fn debug_print(&self) -> String {
+        "Graph Root".to_string()
     }
 }
