@@ -35,13 +35,13 @@ impl TensorHook {
         w.get_autogradmeta()
     }
 
-    /// Todo: Use get_autograd_meta here instead of set_gradient_edge()
-    pub fn materialize_autograd_meta(tensor: &Tensor) -> Option<&mut AutogradMeta> {
+    // Todo: Use get_autograd_meta here instead of set_gradient_edge()
+    pub fn materialize_autograd_meta(tensor: &Tensor) -> &mut AutogradMeta {
         let mut p = tensor._impl.borrow_mut();
         if p.autogradmeta.as_ref().is_none() {
             p.set_autograd_meta(Some(AutogradMetaFactory::make()))
         }
-        TensorHook::get_autograd_meta(tensor)
+        TensorHook::get_autograd_meta(tensor).unwrap()
     }
 
     pub fn tensor_data(tensor: &Tensor) -> Tensor {
@@ -54,7 +54,7 @@ impl TensorHook {
     }
 
     pub fn set_grad_accumulator(tensor: &Tensor, grad_accumulator: Option<Weak<RefCell<Node>>>) {
-        let t = Self::materialize_autograd_meta(tensor).unwrap();
+        let t = Self::materialize_autograd_meta(tensor);
         t.grad_accumulator_ = grad_accumulator;
     }
 

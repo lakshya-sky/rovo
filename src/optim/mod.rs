@@ -12,13 +12,25 @@ impl OptimizerParamGroup {
         Self { params }
     }
 
-    pub fn params(&mut self) -> &Vec<Tensor> {
+    pub fn params(&self) -> &Vec<Tensor> {
         &self.params
     }
 }
 
 trait Optimizer {
     fn step(&mut self) -> Option<Tensor>;
+    fn param_groups(&self) -> &Vec<OptimizerParamGroup>;
+    fn zero_grad(&self) {
+        for group in self.param_groups() {
+            for p in group.params() {
+                if let Some(grad) = p.grad() {
+                    let mut grad_borrow = grad.borrow_mut();
+                    grad_borrow.detach_();
+                    grad_borrow.zero_();
+                }
+            }
+        }
+    }
 }
 pub struct SGD {
     param_groups: Vec<OptimizerParamGroup>,
@@ -58,6 +70,10 @@ impl Optimizer for SGD {
         }
         None
     }
+
+    fn param_groups(&self) -> &Vec<OptimizerParamGroup> {
+        self.param_groups.as_ref()
+    }
 }
 
 #[cfg(test)]
@@ -75,9 +91,12 @@ mod test {
         let sigmoid = Functional::new(Functional::sigmoid());
         let mut sgd = SGD::new(linear.parameters());
         let x = Tensor::from_scalar(&[2, 2], 2.0, true);
+
+        sgd.zero_grad();
         let y = linear.forward(&[&x]);
         let result = sigmoid.forward(&[&y]);
         println!("Result: {:?}", result);
+
         backward::backward(&vec![result], &vec![], false);
         {
             println!("Weights Before step: {:?}", linear.parameters());

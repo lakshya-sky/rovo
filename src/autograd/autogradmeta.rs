@@ -60,6 +60,13 @@ impl AutogradMeta {
     pub fn set_requires_grad(&mut self, requires_grad: bool) {
         self.requires_grad = requires_grad
     }
+
+    pub fn grad_fn_reset(&mut self) {
+        if let Some(grad_fn) = self.grad_fn_.as_ref() {
+            drop(grad_fn);
+            self.grad_fn_ = None;
+        }
+    }
 }
 
 pub struct AutogradMetaFactory {}

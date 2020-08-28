@@ -200,6 +200,18 @@ impl Tensor {
     pub fn sum_dim(&self, dims: &[usize], keep_dim: bool) -> Tensor {
         tensor_ops::sum(self, Some(dims), keep_dim)
     }
+
+    pub fn detach_(&mut self) -> &Self {
+        let autograd_meta = crate::util_autograd::TensorHook::materialize_autograd_meta(self);
+        autograd_meta.set_requires_grad(false);
+        autograd_meta.grad_fn_reset();
+        autograd_meta.output_nr = 0;
+        self
+    }
+
+    pub fn zero_(&mut self) {
+        self.get_tensor_impl().data.fill(0.0);
+    }
 }
 
 #[derive(Clone)]
