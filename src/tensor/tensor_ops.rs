@@ -404,3 +404,51 @@ pub fn sigmoid(tensor: &Tensor) -> Tensor {
     }
     result
 }
+
+pub fn binary_cross_entropy(
+    self_: &Tensor,
+    target: &Tensor,
+    weight: Option<&Tensor>,
+    reduction: usize,
+) -> Tensor {
+    let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
+    if util_autograd::compute_requires_grad(&[self_]) {
+        let mut _grad_fn = BinaryCrossEntropyBackward::default();
+        _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[self_]));
+        _grad_fn.self_ = Some(SavedTensor::new(self_, true));
+        _grad_fn.target_ = Some(SavedTensor::new(target, true));
+        if let Some(weight) = weight {
+            _grad_fn.weight_ = Some(SavedTensor::new(weight, true));
+        }
+        _grad_fn.reduction = reduction;
+        grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
+    }
+
+    if grad_fn.is_some() {
+        util_autograd::set_history(self_, grad_fn.unwrap());
+    }
+    todo!()
+}
+
+pub fn binary_cross_entropy_backward(
+    grad: &Tensor,
+    input: &Tensor,
+    target: &Tensor,
+    weight: Option<&Tensor>,
+    reduction: usize,
+) -> Tensor {
+    let mut grad_input = Tensor::empty_like(input);
+    binary_cross_entropy_backward_out(&mut grad_input, grad, input, target, weight, reduction);
+    grad_input
+}
+
+pub fn binary_cross_entropy_backward_out(
+    grad_input: &mut Tensor,
+    grad: &Tensor,
+    input: &Tensor,
+    target: &Tensor,
+    weight: Option<&Tensor>,
+    reduction: usize,
+) {
+    
+}

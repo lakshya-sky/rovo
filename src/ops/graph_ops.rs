@@ -584,7 +584,7 @@ impl NodeTrait for SigmoidBackward {
     fn call(&mut self, input: Vec<Tensor>) -> Vec<Tensor> {
         let grad_input = input.first().unwrap();
         let result = self.result_.as_ref().unwrap().unpack();
-        let grad_result = (-&result + 1.0)*&result*grad_input;
+        let grad_result = (-&result + 1.0) * &result * grad_input;
         vec![grad_result]
     }
 
@@ -623,5 +623,80 @@ impl NodeTrait for SigmoidBackward {
 
     fn debug_print(&self) -> String {
         "SigmoidBackward".to_string()
+    }
+}
+
+pub struct BinaryCrossEntropyBackward {
+    pub input_metadata_: SmallVec<[InputMetaData; 2]>,
+    pub next_edges: Option<EdgeList>,
+    pub self_: Option<SavedTensor>,
+    pub target_: Option<SavedTensor>,
+    pub weight_: Option<SavedTensor>,
+    pub reduction: usize,
+}
+
+impl Default for BinaryCrossEntropyBackward {
+    fn default() -> Self {
+        Self {
+            input_metadata_: smallvec![],
+            next_edges: None,
+            self_: None,
+            target_: None,
+            weight_: None,
+            reduction: 0,
+        }
+    }
+}
+impl NodeTrait for BinaryCrossEntropyBackward {
+    fn call(&mut self, input: Vec<Tensor>) -> Vec<Tensor> {
+        let grad_input = input.first().unwrap();
+        let self_ = self.self_.as_ref().unwrap().unpack();
+        let target_ = self.target_.as_ref().unwrap().unpack();
+        let weight = self.weight_.as_ref().and_then(|f| Some(f.unpack()));
+        let grad_result = binary_cross_entropy_backward(
+            grad_input,
+            &self_,
+            &target_,
+            weight.as_ref(),
+            self.reduction,
+        );
+        vec![grad_result]
+    }
+
+    fn set_next_edges(&mut self, edges: Vec<Edge>) {
+        self.next_edges = Some(edges)
+    }
+
+    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+        let input_nr = self.input_metadata_.len();
+        self.input_metadata_
+            .push(InputMetaData::from_tensor(tensor));
+        input_nr
+    }
+
+    fn next_edges(&self) -> Option<&EdgeList> {
+        self.next_edges.as_ref()
+    }
+
+    fn next_edge(&self, i: usize) -> Option<Edge> {
+        let edges = self.next_edges.as_ref().unwrap();
+        let e = edges.get(i).and_then(|e| Some(e.clone()));
+        e
+    }
+
+    fn num_inputs(&self) -> usize {
+        self.input_metadata_.len()
+    }
+
+    fn num_outputs(&self) -> usize {
+        self.next_edges.as_ref().unwrap().len()
+    }
+
+    fn input_metadata(&self, index: usize) -> &InputMetaData {
+        self.input_metadata_.get(index).unwrap()
+    }
+
+    fn debug_print(&self) -> String {
+        "BinaryCrossEntropy".to_string()
     }
 }

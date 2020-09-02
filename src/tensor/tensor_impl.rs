@@ -82,6 +82,12 @@ impl TensorImpl {
         _impl
     }
 
+    pub fn empty_like(other: &Self) -> Self {
+        Self::new_from_array(
+            unsafe { ndarray::Array::uninitialized(other.sizes()) },
+            false,
+        )
+    }
     pub fn grad(&self) -> Option<Rc<RefCell<Tensor>>> {
         self.autogradmeta.as_ref().unwrap().grad()
     }

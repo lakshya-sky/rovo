@@ -212,6 +212,10 @@ impl Tensor {
     pub fn zero_(&mut self) {
         self.get_tensor_impl().data.fill(0.0);
     }
+
+    pub fn empty_like(other: &Tensor) -> Tensor {
+        Tensor::from_impl(TensorImpl::empty_like(other.get_tensor_impl()))
+    }
 }
 
 #[derive(Clone)]
