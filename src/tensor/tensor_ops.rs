@@ -444,11 +444,36 @@ pub fn binary_cross_entropy_backward(
 
 pub fn binary_cross_entropy_backward_out(
     grad_input: &mut Tensor,
-    grad: &Tensor,
+    _grad: &Tensor,
     input: &Tensor,
     target: &Tensor,
-    weight: Option<&Tensor>,
-    reduction: usize,
+    _weight: Option<&Tensor>,
+    _reduction: usize,
 ) {
-    
+    let iter = tensor_iterator::TensorIteratorConfig::default()
+        .add_output(grad_input)
+        .add_input(input)
+        .add_input(target)
+        .build();
+    iter.for_each(|input_val, target_val| {
+        let return_val = (target_val - 1.0) * ((1.0 - input_val).ln().max(-100.0))
+            - (target_val * input_val.ln().max(-100.0));
+        println!("Return value from closure {}", return_val);
+        return_val
+    });
+
+    // todo!()
+}
+
+#[cfg(test)]
+mod test {
+    use crate::tensor::Tensor;
+    #[test]
+    fn bce_loss_test() {
+        let input = Tensor::from_scalar(&[2, 2], 2.0, false);
+        let target = Tensor::from_scalar(&[2, 2], 3.0, false);
+        let grad = Tensor::from_scalar(&[2, 2], 1.0, false);
+        let result = super::binary_cross_entropy_backward(&grad, &input, &target, None, 0);
+        println!("BCE Result: {:?}", result);
+    }
 }

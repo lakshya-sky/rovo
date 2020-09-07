@@ -1,6 +1,7 @@
 mod linear_algebra;
 mod tensor;
 mod tensor_impl;
+mod tensor_iterator;
 mod tensor_ops;
 mod tensor_util;
 

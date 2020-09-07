@@ -216,6 +216,10 @@ impl Tensor {
     pub fn empty_like(other: &Tensor) -> Tensor {
         Tensor::from_impl(TensorImpl::empty_like(other.get_tensor_impl()))
     }
+
+    pub fn numel(&self) -> usize {
+        self.get_tensor_impl().data.len()
+    }
 }
 
 #[derive(Clone)]

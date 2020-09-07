@@ -9,7 +9,7 @@ To-do:
 - [x] Basic Linear Layer.
 - [X] function for comparing two tensors. (shallow_comapre that compares only data and shape)
 - [X] basic Optimizer (SGD, Adam)
-- [ ] TensorIterator and TensorInteratorConfig.
+- [-] TensorIterator and TensorInteratorConfig.
 - [ ] Binary_Cross_Entropy.
 - [ ] Impl OrderedDict similiar to python's.
 - [ ] Pow, Exp operators.

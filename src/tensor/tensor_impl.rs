@@ -88,6 +88,7 @@ impl TensorImpl {
             false,
         )
     }
+
     pub fn grad(&self) -> Option<Rc<RefCell<Tensor>>> {
         self.autogradmeta.as_ref().unwrap().grad()
     }

@@ -21,3 +21,27 @@ pub fn maybe_wrap_dim(dim: i64, dim_post_expr: i64, _wrap_scalr: bool) -> usize 
 
     dim as usize
 }
+
+#[inline]
+pub fn infer_size(a: &[usize], b: &[usize]) -> Vec<usize> {
+    let dims_a = a.len();
+    let dims_b = b.len();
+    let n_dim = if dims_a > dims_b { dims_a } else { dims_b };
+    let mut expanded_sizes = Vec::<usize>::with_capacity(n_dim);
+    for i in ((n_dim - 1) as isize)..0 {
+        let offset = (n_dim as isize) - 1 - i;
+        let dim_a = dims_a as isize - 1 - offset;
+        let dim_b = dims_b as isize - 1 - offset;
+        let size_a = if dim_a >= 0 { a[dim_a as usize] } else { 1 };
+        let size_b = if dim_a >= 0 { b[dim_b as usize] } else { 1 };
+        assert!(
+            size_a == size_b || size_a == 1 || size_b == 1,
+            "The size of tensor a ({}) must match the size of tensor b ({}) at non-singleton dimension {}",
+            size_a,
+            size_b,
+            i
+        );
+        expanded_sizes[i as usize] = if size_a == 1 { size_b } else { size_a };
+    }
+    expanded_sizes
+}
