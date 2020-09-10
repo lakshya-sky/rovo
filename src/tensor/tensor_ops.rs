@@ -21,8 +21,6 @@ impl Add<Self> for Tensor {
                 .borrow_mut()
                 .set_next_edges(util_autograd::collect_next_edges(&[&self, &rhs]));
         }
-        println!("LHS: {:?}", &self._impl.borrow().data);
-        println!("RHS: {:?}", &rhs._impl.borrow().data);
         let result = &self._impl.borrow().data + &rhs._impl.borrow().data;
         let _impl = TensorImpl {
             data: result,
@@ -414,7 +412,7 @@ pub fn sigmoid(tensor: &Tensor) -> Tensor {
             result_: None,
         };
         _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[tensor]));
-        _grad_fn.result_ = Some(SavedTensor::new(tensor, true));
+        _grad_fn.result_ = Some(SavedTensor::new(&result, true));
         grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
     }
 
@@ -428,25 +426,37 @@ pub fn binary_cross_entropy(
     input: &Tensor,
     target: &Tensor,
     weight: Option<&Tensor>,
-    reduction: Reduction,
+    reduction: super::loss::Reduction,
 ) -> Tensor {
     let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
     if util_autograd::compute_requires_grad(&[input]) {
         let mut _grad_fn = BinaryCrossEntropyBackward::default();
         _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[input]));
-        _grad_fn.self_ = Some(SavedTensor::new(input, true));
-        _grad_fn.target_ = Some(SavedTensor::new(target, true));
+        _grad_fn.self_ = Some(SavedTensor::new(input, false));
+        _grad_fn.target_ = Some(SavedTensor::new(target, false));
         if let Some(weight) = weight {
-            _grad_fn.weight_ = Some(SavedTensor::new(weight, true));
+            _grad_fn.weight_ = Some(SavedTensor::new(weight, false));
         }
         _grad_fn.reduction = reduction;
         grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
     }
-    let result = tensor_ops::binary_cross_entropy(input, target, weight, reduction);
+    let result = loss::binary_cross_entropy(input, target, weight, reduction);
     if grad_fn.is_some() {
-        util_autograd::set_history(input, grad_fn.unwrap());
+        util_autograd::set_history(&result, grad_fn.unwrap());
     }
     result
 }
 
-
+#[cfg(test)]
+mod test {
+    use crate::autograd::backward::backward;
+    use crate::tensor::{sigmoid, Tensor};
+    #[test]
+    fn test_sigmoid_backward() {
+        let input = Tensor::from_scalar(&[2, 3], 1.0, true);
+        let result = sigmoid(&input);
+        println!("Result: {:?}", result);
+        backward(&vec![result], &vec![], false);
+        println!("Input Grad: {:?}", input.grad());
+    }
+}

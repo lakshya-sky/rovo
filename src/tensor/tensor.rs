@@ -262,26 +262,14 @@ impl Edge {
             input_nr: 0,
         }
     }
-    pub fn new(function: Rc<RefCell<Node>>, input_nr: usize) -> Edge {
-        let n = Rc::into_raw(function);
-        let q = Some(unsafe { Rc::from_raw(n) });
+    pub fn new(function: Option<Rc<RefCell<Node>>>, input_nr: usize) -> Edge {
+        // let n = Rc::into_raw(function);
+        // let q = Some(unsafe { Rc::from_raw(n) });
 
-        Edge {
-            function: q,
-            input_nr,
-        }
+        Edge { function, input_nr }
     }
 
     pub fn function(&self) -> Option<&Rc<RefCell<Node>>> {
         self.function.as_ref()
-    }
-}
-#[cfg(test)]
-mod test {
-    use crate::tensor::*;
-    #[test]
-    fn test_zeros() {
-        let a = Tensor::zeros(&[2, 2]);
-        println!("{}", a._impl.borrow().data);
     }
 }

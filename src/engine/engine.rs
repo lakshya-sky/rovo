@@ -86,7 +86,7 @@ impl Engine {
     pub fn call_function(func: *mut Node, inputs: InputBuffer) -> VariableList {
         let inputs = InputBuffer::variables(inputs);
         let fn_ = unsafe { &mut *func };
-        println!("Calling {:?}", fn_._impl);
+        // eprintln!("Calling {:?}", fn_._impl);
         let outputs = fn_.call(inputs);
         Self::evaluate_outputs(fn_.next_edges(), outputs)
     }

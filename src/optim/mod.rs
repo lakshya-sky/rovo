@@ -57,7 +57,7 @@ impl Optimizer for SGD {
                     Some(d_p_) => {
                         if weight_decay != 0.0 {
                             let borrow_ = d_p_.borrow_mut();
-                            println!("Weight Grad Before: {:?}", borrow_);
+                            // eprintln!("Weight Grad Before: {:?}", borrow_);
                             let d_p = &borrow_.clone() + weight_decay;
                             borrow_.move_tensor(d_p);
                         }
@@ -91,10 +91,17 @@ mod test {
         let sigmoid = Functional::new(Functional::sigmoid());
         let mut sgd = SGD::new(linear.parameters());
         let x = Tensor::from_scalar(&[2, 2], 2.0, true);
-
         sgd.zero_grad();
-        let y = linear.forward(&[&x]);
-        let result = sigmoid.forward(&[&y]);
+        let h = linear.forward(&[&x]);
+        let y = sigmoid.forward(&[&h]);
+        let target = Tensor::ones(&[2, 1]);
+        let result = crate::tensor::binary_cross_entropy(
+            &y,
+            &target,
+            None,
+            crate::tensor::loss::Reduction::Mean,
+        );
+        println!("Y: {:?}", y);
         println!("Result: {:?}", result);
 
         backward::backward(&vec![result], &vec![], false);

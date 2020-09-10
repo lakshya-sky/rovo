@@ -632,7 +632,7 @@ pub struct BinaryCrossEntropyBackward {
     pub self_: Option<SavedTensor>,
     pub target_: Option<SavedTensor>,
     pub weight_: Option<SavedTensor>,
-    pub reduction: Reduction,
+    pub reduction: loss::Reduction,
 }
 
 impl Default for BinaryCrossEntropyBackward {
@@ -643,17 +643,18 @@ impl Default for BinaryCrossEntropyBackward {
             self_: None,
             target_: None,
             weight_: None,
-            reduction: Reduction::None,
+            reduction: loss::Reduction::None,
         }
     }
 }
+
 impl NodeTrait for BinaryCrossEntropyBackward {
     fn call(&mut self, input: Vec<Tensor>) -> Vec<Tensor> {
         let grad_input = input.first().unwrap();
         let self_ = self.self_.as_ref().unwrap().unpack();
         let target_ = self.target_.as_ref().unwrap().unpack();
         let weight = self.weight_.as_ref().and_then(|f| Some(f.unpack()));
-        let grad_result = binary_cross_entropy_backward(
+        let grad_result = loss::binary_cross_entropy_backward(
             grad_input,
             &self_,
             &target_,
@@ -697,7 +698,7 @@ impl NodeTrait for BinaryCrossEntropyBackward {
     }
 
     fn debug_print(&self) -> String {
-        "BinaryCrossEntropy".to_string()
+        "BinaryCrossEntropyBackward".to_string()
     }
 }
 

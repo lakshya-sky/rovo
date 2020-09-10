@@ -7,7 +7,7 @@ mod engine;
 mod ndarry_ext;
 mod nn;
 mod ops;
+mod optim;
 mod tensor;
 mod util;
 mod util_autograd;
-mod optim;

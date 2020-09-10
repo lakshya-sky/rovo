@@ -55,6 +55,5 @@ pub fn sum_to(mut tensor: Tensor, shape: &[usize]) -> Tensor {
     if !reduce_dims.is_empty() {
         tensor = tensor.sum_dim(reduce_dims.as_slice(), true)
     }
-    println!("sum_to: Tensor shape {:?}", tensor.sizes());
     tensor
 }

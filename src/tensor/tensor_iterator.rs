@@ -35,6 +35,7 @@ impl TensorIterator {
         self_.populate_operands(config);
         self_.compute_shape(config);
         self_.resize_outputs(config);
+        self_.resize_inputs(config);
         self_
     }
 
@@ -77,11 +78,11 @@ impl TensorIterator {
                     self.shape_.extend_from_slice(shape);
                 } else if shape != self.shape_.as_slice() {
                     self.all_ops_same_shape_ = false;
-                    //Todo: infer_size
                     let tmp = super::tensor_util::infer_size(self.shape_.as_slice(), shape);
                     self.shape_.copy_from_slice(tmp.as_slice());
                 }
-                println!("Oprands have same shape? {}", self.all_ops_same_shape_);
+                // eprintln!("Iter Shape: {:?}", self.shape_);
+                // eprintln!("Oprands have same shape? {}", self.all_ops_same_shape_);
             }
         }
     }
@@ -90,10 +91,35 @@ impl TensorIterator {
         if config.static_shape_.is_none() {
             for i in 0..self.num_outputs_ {
                 let tensor = &self.oprands_[i].tensor;
+                tensor.get_tensor_impl().data = tensor
+                    .get_tensor_impl()
+                    .data
+                    .clone()
+                    .into_shape(self.shape_.as_slice())
+                    .unwrap();
                 assert_eq!(
                     tensor.sizes(),
                     self.shape_.as_slice(),
-                    "Yet to implement output resizing for TenssorIterator"
+                    "Yet to implement output resizing for TensorIterator"
+                );
+            }
+        }
+    }
+
+    pub fn resize_inputs(&self, config: &TensorIteratorConfig) {
+        if config.static_shape_.is_none() {
+            for i in self.num_outputs_..self.oprands_.len() {
+                let tensor = &self.oprands_[i].tensor;
+                tensor.get_tensor_impl().data = tensor
+                    .get_tensor_impl()
+                    .data
+                    .broadcast(self.shape_.as_slice())
+                    .unwrap()
+                    .into_owned();
+                assert_eq!(
+                    tensor.sizes(),
+                    self.shape_.as_slice(),
+                    "Yet to implement output resizing for TensorIterator"
                 );
             }
         }
@@ -135,6 +161,59 @@ impl TensorIterator {
                 _ => break,
             }
             i += 1;
+        }
+    }
+
+    pub fn for_each_ternary(&self, op: impl Fn(&f64, &f64, &f64) -> f64) {
+        // For each assumes that there is only single output right now
+        // and the accepted closure accepts only two inputs
+
+        let output = &self.oprands_.first().unwrap().tensor;
+        let first_in = &self.oprands_.get(1).unwrap().tensor;
+        let second_in = &self.oprands_.get(2).unwrap().tensor;
+        let third_in = &self.oprands_.get(3).unwrap().tensor;
+        let out_numel = output.numel();
+
+        assert!(
+            (out_numel == first_in.numel())
+                && (out_numel == second_in.numel())
+                && (out_numel == third_in.numel()),
+            format!(
+                "oprands should have same number of elements, but got {},{},{},{}",
+                out_numel,
+                first_in.numel(),
+                second_in.numel(),
+                third_in.numel()
+            )
+        );
+
+        // let mut out_iter = output.get_tensor_impl().data.iter_mut();
+        let mut first_iter = first_in.get_tensor_impl().data.iter();
+        let mut second_iter = second_in.get_tensor_impl().data.iter();
+        let mut third_iter = third_in.get_tensor_impl().data.iter();
+        let sizes = output.sizes();
+
+        // Todo: here it is assumed that each operand is only two dimentional
+        // extend it to handle any dimensions.
+        // let rows = sizes[0];
+        let columns: usize = sizes[1];
+        let mut row: usize;
+        let mut col: usize;
+        let mut idx = 0usize;
+        {
+            let data = &mut output.get_tensor_impl().data;
+            loop {
+                match (first_iter.next(), second_iter.next(), third_iter.next()) {
+                    (Some(g), Some(i), Some(t)) => {
+                        let result = op(g, i, t);
+                        row = idx / columns;
+                        col = idx % columns;
+                        data[[row, col]] = result;
+                    }
+                    _ => break,
+                }
+                idx += 1;
+            }
         }
     }
 }

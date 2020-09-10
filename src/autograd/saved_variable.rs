@@ -26,7 +26,9 @@ impl SavedTensor {
         let mut grad_accumulator: Option<Weak<RefCell<Node>>> = None;
         let mut grad_fn = None;
         if tensor.is_leaf() {
-            grad_accumulator = Some(Rc::downgrade(&util_autograd::grad_accumulator(tensor)));
+            grad_accumulator =
+                util_autograd::grad_accumulator(tensor).and_then(|acc| Some(Rc::downgrade(&acc)));
+        // Some(Rc::downgrade(&util_autograd::grad_accumulator(tensor)));
         } else if !is_output {
             grad_fn = tensor.grad_fn();
         }
@@ -53,7 +55,8 @@ impl SavedTensor {
         let mut grad_accumulator: Option<Weak<RefCell<Node>>> = None;
         let mut grad_fn = None;
         if tensor.is_leaf() {
-            grad_accumulator = Some(Rc::downgrade(&util_autograd::grad_accumulator(&tensor)));
+            grad_accumulator =
+                util_autograd::grad_accumulator(&tensor).and_then(|acc| Some(Rc::downgrade(&acc)));
         } else if !is_output {
             grad_fn = tensor.grad_fn();
         }
@@ -81,7 +84,7 @@ impl SavedTensor {
         if let Some(grad_fn) = &self.grad_fn {
             tensor = Tensor::make_variable(
                 self.data.clone(),
-                Edge::new(grad_fn.clone(), self.output_nr),
+                Edge::new(Some(grad_fn.clone()), self.output_nr),
             )
         } else {
             tensor = Tensor::make_variable_without_edge(self.data.clone(), self.requires_grad);

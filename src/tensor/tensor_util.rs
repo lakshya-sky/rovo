@@ -24,11 +24,13 @@ pub fn maybe_wrap_dim(dim: i64, dim_post_expr: i64, _wrap_scalr: bool) -> usize 
 
 #[inline]
 pub fn infer_size(a: &[usize], b: &[usize]) -> Vec<usize> {
+    // eprintln!("a: {:?}, b: {:?}", a, b);
     let dims_a = a.len();
     let dims_b = b.len();
     let n_dim = if dims_a > dims_b { dims_a } else { dims_b };
     let mut expanded_sizes = Vec::<usize>::with_capacity(n_dim);
-    for i in ((n_dim - 1) as isize)..0 {
+    // eprintln!("ndim: {}", n_dim);
+    for i in (0..n_dim as isize).rev() {
         let offset = (n_dim as isize) - 1 - i;
         let dim_a = dims_a as isize - 1 - offset;
         let dim_b = dims_b as isize - 1 - offset;
@@ -41,7 +43,8 @@ pub fn infer_size(a: &[usize], b: &[usize]) -> Vec<usize> {
             size_b,
             i
         );
-        expanded_sizes[i as usize] = if size_a == 1 { size_b } else { size_a };
+
+        expanded_sizes.push(if size_a == 1 { size_b } else { size_a });
     }
     expanded_sizes
 }
