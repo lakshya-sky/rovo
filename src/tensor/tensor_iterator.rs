@@ -120,7 +120,7 @@ impl TensorIterator {
         // Todo: here it is assumed that each operand is only two dimentional
         // extend it to handle any dimensions.
         // let rows = sizes[0];
-        let columns = sizes[0];
+        let columns = sizes[1];
         let mut row;
         let mut col;
         let mut i = 0usize;

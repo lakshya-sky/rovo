@@ -360,6 +360,25 @@ pub fn mm(mat1: &Tensor, mat2: &Tensor, consume: bool) -> Tensor {
     result
 }
 
+pub fn mean(self_: &Tensor) -> Tensor {
+    let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
+    if util_autograd::compute_requires_grad(&[self_]) {
+        let mut _grad_fn = MeanBackward {
+            next_edges: None,
+            input_metadata_: smallvec::smallvec![],
+            self_numel: self_.numel(),
+            self_sizes: self_.sizes().to_vec(),
+        };
+        _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[self_]));
+        grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
+    }
+    let result = super::linear_algebra::mean(self_);
+    if grad_fn.is_some() {
+        util_autograd::set_history(&self_, grad_fn.unwrap());
+    }
+    result
+}
+
 pub fn sum(self_: &Tensor, dims: Option<&[usize]>, keep_dim: bool) -> Tensor {
     let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
     if util_autograd::compute_requires_grad(&[self_]) {
@@ -406,16 +425,16 @@ pub fn sigmoid(tensor: &Tensor) -> Tensor {
 }
 
 pub fn binary_cross_entropy(
-    self_: &Tensor,
+    input: &Tensor,
     target: &Tensor,
     weight: Option<&Tensor>,
-    reduction: usize,
+    reduction: Reduction,
 ) -> Tensor {
     let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
-    if util_autograd::compute_requires_grad(&[self_]) {
+    if util_autograd::compute_requires_grad(&[input]) {
         let mut _grad_fn = BinaryCrossEntropyBackward::default();
-        _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[self_]));
-        _grad_fn.self_ = Some(SavedTensor::new(self_, true));
+        _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[input]));
+        _grad_fn.self_ = Some(SavedTensor::new(input, true));
         _grad_fn.target_ = Some(SavedTensor::new(target, true));
         if let Some(weight) = weight {
             _grad_fn.weight_ = Some(SavedTensor::new(weight, true));
@@ -423,57 +442,11 @@ pub fn binary_cross_entropy(
         _grad_fn.reduction = reduction;
         grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
     }
-
+    let result = tensor_ops::binary_cross_entropy(input, target, weight, reduction);
     if grad_fn.is_some() {
-        util_autograd::set_history(self_, grad_fn.unwrap());
+        util_autograd::set_history(input, grad_fn.unwrap());
     }
-    todo!()
+    result
 }
 
-pub fn binary_cross_entropy_backward(
-    grad: &Tensor,
-    input: &Tensor,
-    target: &Tensor,
-    weight: Option<&Tensor>,
-    reduction: usize,
-) -> Tensor {
-    let mut grad_input = Tensor::empty_like(input);
-    binary_cross_entropy_backward_out(&mut grad_input, grad, input, target, weight, reduction);
-    grad_input
-}
 
-pub fn binary_cross_entropy_backward_out(
-    grad_input: &mut Tensor,
-    _grad: &Tensor,
-    input: &Tensor,
-    target: &Tensor,
-    _weight: Option<&Tensor>,
-    _reduction: usize,
-) {
-    let iter = tensor_iterator::TensorIteratorConfig::default()
-        .add_output(grad_input)
-        .add_input(input)
-        .add_input(target)
-        .build();
-    iter.for_each(|input_val, target_val| {
-        let return_val = (target_val - 1.0) * ((1.0 - input_val).ln().max(-100.0))
-            - (target_val * input_val.ln().max(-100.0));
-        println!("Return value from closure {}", return_val);
-        return_val
-    });
-
-    // todo!()
-}
-
-#[cfg(test)]
-mod test {
-    use crate::tensor::Tensor;
-    #[test]
-    fn bce_loss_test() {
-        let input = Tensor::from_scalar(&[2, 2], 2.0, false);
-        let target = Tensor::from_scalar(&[2, 2], 3.0, false);
-        let grad = Tensor::from_scalar(&[2, 2], 1.0, false);
-        let result = super::binary_cross_entropy_backward(&grad, &input, &target, None, 0);
-        println!("BCE Result: {:?}", result);
-    }
-}

@@ -197,8 +197,23 @@ impl Tensor {
         tensor_ops::sum(self, None, false)
     }
 
+    pub fn mean(&self) -> Self {
+        tensor_ops::mean(self)
+    }
+
     pub fn sum_dim(&self, dims: &[usize], keep_dim: bool) -> Tensor {
         tensor_ops::sum(self, Some(dims), keep_dim)
+    }
+
+    pub fn expand(&self, size: &[usize]) -> Tensor {
+        Tensor::from_impl(TensorImpl::new_from_array(
+            self.get_tensor_impl()
+                .data
+                .broadcast(size)
+                .unwrap()
+                .into_owned(),
+            false,
+        ))
     }
 
     pub fn detach_(&mut self) -> &Self {
@@ -211,6 +226,18 @@ impl Tensor {
 
     pub fn zero_(&mut self) {
         self.get_tensor_impl().data.fill(0.0);
+    }
+
+    pub fn mul_(&mut self, other: &Tensor) {
+        let self_data = &self.get_tensor_impl().data;
+        let other_data = &other.get_tensor_impl().data;
+        self.get_tensor_impl().data = self_data * other_data;
+    }
+
+    pub fn div_(&mut self, other: &Tensor) {
+        let self_data = &self.get_tensor_impl().data;
+        let other_data = &other.get_tensor_impl().data;
+        self.get_tensor_impl().data = self_data / other_data;
     }
 
     pub fn empty_like(other: &Tensor) -> Tensor {

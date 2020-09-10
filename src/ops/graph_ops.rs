@@ -632,7 +632,7 @@ pub struct BinaryCrossEntropyBackward {
     pub self_: Option<SavedTensor>,
     pub target_: Option<SavedTensor>,
     pub weight_: Option<SavedTensor>,
-    pub reduction: usize,
+    pub reduction: Reduction,
 }
 
 impl Default for BinaryCrossEntropyBackward {
@@ -643,7 +643,7 @@ impl Default for BinaryCrossEntropyBackward {
             self_: None,
             target_: None,
             weight_: None,
-            reduction: 0,
+            reduction: Reduction::None,
         }
     }
 }
@@ -698,5 +698,62 @@ impl NodeTrait for BinaryCrossEntropyBackward {
 
     fn debug_print(&self) -> String {
         "BinaryCrossEntropy".to_string()
+    }
+}
+
+pub struct MeanBackward {
+    pub input_metadata_: SmallVec<[InputMetaData; 2]>,
+    pub next_edges: Option<EdgeList>,
+    pub self_sizes: Vec<usize>,
+    pub self_numel: usize,
+}
+
+impl NodeTrait for MeanBackward {
+    fn call(&mut self, input: Vec<Tensor>) -> Vec<Tensor> {
+        let grad_input = input.first().unwrap();
+        let mut result = grad_input.expand(self.self_sizes.as_slice());
+        result.div_(&Tensor::from_scalar(
+            result.sizes(),
+            self.self_numel as f64,
+            false,
+        ));
+        vec![result]
+    }
+
+    fn set_next_edges(&mut self, edges: Vec<Edge>) {
+        self.next_edges = Some(edges)
+    }
+
+    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+        let input_nr = self.input_metadata_.len();
+        self.input_metadata_
+            .push(InputMetaData::from_tensor(tensor));
+        input_nr
+    }
+
+    fn next_edges(&self) -> Option<&EdgeList> {
+        self.next_edges.as_ref()
+    }
+
+    fn next_edge(&self, i: usize) -> Option<Edge> {
+        let edges = self.next_edges.as_ref().unwrap();
+        let e = edges.get(i).and_then(|e| Some(e.clone()));
+        e
+    }
+
+    fn num_inputs(&self) -> usize {
+        self.input_metadata_.len()
+    }
+
+    fn num_outputs(&self) -> usize {
+        self.next_edges.as_ref().unwrap().len()
+    }
+
+    fn input_metadata(&self, index: usize) -> &InputMetaData {
+        self.input_metadata_.get(index).unwrap()
+    }
+
+    fn debug_print(&self) -> String {
+        "MeanBackward".to_string()
     }
 }

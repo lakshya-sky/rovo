@@ -53,3 +53,9 @@ pub fn sum(self_: &Tensor, dims: Option<&[usize]>, _keep_dim: bool) -> Tensor {
     }
     Tensor::from_impl(TensorImpl::new_from_array(data, false))
 }
+
+pub fn mean(self_: &Tensor) -> Tensor {
+    let data = &self_.get_tensor_impl().data;
+    let arr0 = ndarray::arr0(data.mean().unwrap());
+    Tensor::from_impl(TensorImpl::new_from_array(arr0.into_dyn(), false))
+}

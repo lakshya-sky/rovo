@@ -1,10 +1,12 @@
 mod linear_algebra;
+mod loss;
 mod tensor;
 mod tensor_impl;
 mod tensor_iterator;
 mod tensor_ops;
 mod tensor_util;
 
+pub use self::loss::*;
 pub use self::tensor::*;
 pub use self::tensor_impl::*;
 pub use self::tensor_ops::*;
