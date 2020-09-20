@@ -24,16 +24,6 @@ impl CPUGeneratorImpl {
         }
     }
 
-    pub fn set_current_seed(&mut self, seed: u64) {
-        self.next_double_normal_sample = None;
-        self.next_float_normal_sample = None;
-        self.engine = mt19937_engine::MT19937Engine::new(Some(seed))
-    }
-
-    pub fn current_seed(&self) -> u64 {
-        todo!()
-    }
-
     pub fn seed(&mut self) -> u64 {
         let random = super::get_non_deterministic_random(false);
         self.set_current_seed(random);
@@ -75,15 +65,29 @@ impl CPUGeneratorImpl {
     }
 }
 
-impl Clone for CPUGeneratorImpl {
-    fn clone(&self) -> Self {
-        self.clone_impl()
-    }
-}
+// impl Clone for CPUGeneratorImpl {
+//     fn clone(&self) -> Self {
+//         self.clone_impl()
+//     }
+// }
 
 impl GeneratorImpl for CPUGeneratorImpl {
     fn random(&mut self) -> u32 {
         self.random_()
+    }
+
+    fn clone(&self) -> Self {
+        self.clone_impl()
+    }
+
+    fn set_current_seed(&mut self, seed: u64) {
+        self.next_double_normal_sample = None;
+        self.next_float_normal_sample = None;
+        self.engine = mt19937_engine::MT19937Engine::new(Some(seed))
+    }
+
+    fn current_seed(&self) -> u64 {
+        self.engine.seed()
     }
 }
 

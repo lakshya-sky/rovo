@@ -208,6 +208,7 @@ impl Engine {
         create_graph: bool,
         _output_edges: &mut EdgeList,
     ) {
+        // println!("Inpots to Graph Root: {:?}", inputs);
         let graph_root = Node::new(GraphRoot::new(roots, inputs));
         let mut task = GraphTask::new(create_graph, 0, self.local_ready_queue.clone());
         Self::compute_dependencies(&graph_root, &mut task);

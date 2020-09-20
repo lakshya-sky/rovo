@@ -24,6 +24,7 @@ impl Default for MT19937DataPod {
         }
     }
 }
+
 #[derive(Debug, Copy, Clone, Default)]
 pub struct MT19937Engine {
     data: MT19937DataPod,
@@ -52,7 +53,7 @@ impl MT19937Engine {
                 )
                 .0
                 + j;
-            println!("{}",self.data.state[j as usize]);
+            // println!("{}",self.data.state[j as usize]);
             self.data.state[j as usize] &= 0xffffffff;
         }
 
@@ -62,12 +63,13 @@ impl MT19937Engine {
 
     pub fn call(&mut self) -> u32 {
         let mut y: u32;
-        self.data.left -= 0;
+        self.data.left -= 1;
         if self.data.left == 0 {
             self.next_state();
         }
+        // y = 2925516573
+        y = unsafe { *self.data.state.as_ptr().offset(self.data.next as isize) };
         self.data.next += 1;
-        y = unsafe { *self.data.state.as_ptr() } + self.data.next;
         y ^= y >> 11;
         y ^= (y << 7) & 0x9d2c5680;
         y ^= (y << 15) & 0xefc60000;
@@ -91,12 +93,12 @@ impl MT19937Engine {
         self.data.left = MERSENNE_STATE_N as i32;
         self.data.next = 0;
 
-        let mut count = 0;
-        for _ in (1..(MERSENNE_STATE_N - MERSENNE_STATE_M)).rev() {
+        // let mut count = 0;
+        for _ in (1..(MERSENNE_STATE_N - MERSENNE_STATE_M + 1)).rev() {
             unsafe {
+                // p: 0, count =102, j=125;
                 *p = *p.offset(MERSENNE_STATE_M as isize) ^ Self::twist(*p.offset(0), *p.offset(1));
-                count += 1;
-                p = p.offset(count);
+                p = p.offset(1);
             };
         }
 
@@ -111,5 +113,10 @@ impl MT19937Engine {
             *p = *p.offset(MERSENNE_STATE_M as isize - MERSENNE_STATE_N as isize)
                 ^ Self::twist(*p.offset(0), self.data.state[0]);
         }
+    }
+
+    #[inline]
+    pub fn seed(&self) -> u64 {
+        self.data.seed
     }
 }

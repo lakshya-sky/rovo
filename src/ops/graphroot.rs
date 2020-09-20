@@ -17,9 +17,9 @@ impl GraphRoot {
 impl NodeTrait for GraphRoot {
     fn call(&mut self, _input: VariableList) -> VariableList {
         // self.outputs
-        let outputs = self.outputs.as_slice().to_vec();
-        outputs
-        // self.outputs.clone()
+        // let outputs = self.outputs.as_slice().to_vec();
+        // outputs
+        self.outputs.clone()
     }
 
     fn set_next_edges(&mut self, _edges: EdgeList) {

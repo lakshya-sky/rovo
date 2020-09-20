@@ -6,6 +6,7 @@ use crate::util_autograd;
 // https://github.com/pytorch/pytorch/blob/8850fd1952c3983793dcac4022fdc8e3913dad96/torch/csrc/autograd/autograd.cpp#L127
 pub fn backward(tensors: &VariableList, grad_tensors: &VariableList, create_graph: bool) {
     let grads = _make_grads(tensors, grad_tensors);
+    // println!("Created grads for backpass: {:?}", grads);
     run_backward(tensors, grads, create_graph, &mut vec![])
 }
 
@@ -32,8 +33,10 @@ fn _make_grads(outputs: &VariableList, grad_outputs: &VariableList) -> VariableL
     let mut new_grads: VariableList = vec![];
     new_grads.reserve(num_tensors);
     if grad_outputs.is_empty() {
+        
         for output in outputs {
             if output.requires_grad() {
+                // println!("Pushing new Grads to GradList");
                 new_grads.push(Tensor::ones_like(output))
             }
         }

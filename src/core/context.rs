@@ -18,10 +18,11 @@ pub fn init() {
 fn global_context() -> Context {
     todo!()
 }
-pub fn manual_seed(seed: usize) {
+
+pub fn manual_seed(_seed: u64) {
     let context = global_context();
-    let gen = context.default_generator(Device::CPU);
-    {
-        gen.set_current_seed(seed);
-    }
+    let _gen = context.default_generator(Device::CPU);
+    // {
+    //     gen.set_current_seed(seed);
+    // }
 }

@@ -101,11 +101,14 @@ impl TensorImpl {
     }
 
     pub fn requires_grad(&self) -> bool {
+        let result;
         if let Some(meta) = self.autogradmeta.as_ref() {
-            meta.requires_grad()
+            result = meta.requires_grad()
         } else {
-            false
+            result = false
         }
+        eprintln!("Requires Grad: {}", result);
+        result
     }
 
     pub fn set_requires_grad(&mut self, requires_grad: bool) {
