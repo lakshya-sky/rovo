@@ -1,11 +1,14 @@
 use super::tensor_ops;
+use crate::aten::native;
 use crate::autograd::*;
+use crate::c10::MemoryFormat;
+use crate::core::Generator;
 use crate::ops::*;
 use crate::tensor::*;
 use crate::util_autograd::TensorHook;
 use std::cell::RefCell;
 use std::rc::Rc;
-
+use std::{ffi::c_void, ptr::NonNull};
 #[derive(Clone)]
 pub struct Tensor {
     pub _impl: Rc<RefCell<TensorImpl>>,
@@ -165,6 +168,13 @@ impl Tensor {
         Self::from_impl(TensorImpl::uniform(dims, from, to))
     }
 
+    pub fn uniform_(&self, from: f64, to: f64) {
+        crate::aten::native::distribution_templates::uniform_impl_(self, from, to, None);
+    }
+
+    pub fn uniform_with_gen(&self, from: f64, to: f64, gen: Option<Generator>) {
+        crate::aten::native::distribution_templates::uniform_impl_(self, from, to, gen);
+    }
     pub fn randn(dims: &[usize]) -> Tensor {
         Self::from_impl(TensorImpl::randn(dims))
     }
@@ -244,8 +254,17 @@ impl Tensor {
         Tensor::from_impl(TensorImpl::empty_like(other.get_tensor_impl()))
     }
 
+    pub fn empty(size: &[usize]) -> Tensor {
+        Tensor::from_impl(TensorImpl::empty(size))
+    }
+
     pub fn numel(&self) -> usize {
         self.get_tensor_impl().data.len()
+    }
+
+    pub fn size(&self, dim: i64) -> usize {
+        let dim = maybe_wrap_dim(dim, self.dim(), false);
+        self.sizes()[dim]
     }
 }
 
@@ -271,5 +290,64 @@ impl Edge {
 
     pub fn function(&self) -> Option<&Rc<RefCell<Node>>> {
         self.function.as_ref()
+    }
+}
+#[derive(Clone)]
+pub struct NewTensor {
+    pub _impl: Rc<RefCell<NewTensorImpl>>,
+}
+
+unsafe impl Send for NewTensor {}
+
+impl NewTensor {
+    pub fn from_impl(_impl: NewTensorImpl) -> NewTensor {
+        NewTensor {
+            _impl: Rc::new(RefCell::new(_impl)),
+        }
+    }
+
+    pub fn get_unsafe_tensor_impl(&self) -> &mut NewTensorImpl {
+        let t = self._impl.as_ptr();
+        unsafe { &mut *t }
+    }
+
+    pub fn fill_(&self, value: f32) -> &NewTensor {
+        crate::aten::native::fill_(self, value)
+    }
+    pub fn sizes(&self) -> &[usize] {
+        self.get_unsafe_tensor_impl().sizes()
+    }
+    pub fn numel(&self) -> usize {
+        self.get_unsafe_tensor_impl().numel()
+    }
+    pub fn resize(
+        &self,
+        size: &[usize],
+        optional_memory_format: Option<crate::c10::MemoryFormat>,
+    ) -> &NewTensor {
+        native::resize(self, size, optional_memory_format)
+    }
+    pub fn element_size(&self) -> usize {
+        self.get_unsafe_tensor_impl().item_size()
+    }
+    pub fn defined(&self) -> bool {
+        // Todo: Pytorch checks for if impl is null or not
+        true
+    }
+    pub fn is_contiguous(&self, memory_format: MemoryFormat) -> bool {
+        self.get_unsafe_tensor_impl().is_contiguous(memory_format)
+    }
+    pub fn data_ptr(&self) -> NonNull<c_void> {
+        self.get_unsafe_tensor_impl().data()
+    }
+}
+impl std::fmt::Debug for NewTensor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} \nSize: {:?}",
+            self.get_unsafe_tensor_impl().dim(),
+            self.get_unsafe_tensor_impl()
+        )
     }
 }

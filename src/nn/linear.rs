@@ -4,6 +4,8 @@ pub struct LinearConfig {
     pub ws_init: super::Init,
     pub bs_init: Option<super::Init>,
     pub bias: bool,
+    pub in_features: usize,
+    pub out_features: usize,
 }
 
 impl Default for LinearConfig {
@@ -12,58 +14,93 @@ impl Default for LinearConfig {
             ws_init: super::Init::KaimingUniform,
             bs_init: None,
             bias: true,
+            in_features: 0,
+            out_features: 0,
         }
     }
 }
 #[derive(Debug)]
 pub struct Linear {
-    pub ws: Tensor,
-    pub bs: Tensor,
+    pub ws: Option<Tensor>,
+    pub bs: Option<Tensor>,
+    options: LinearConfig,
 }
 
 impl Linear {
-    pub fn new(in_dim: usize, out_dim: usize, c: LinearConfig) -> Self {
-        let bs = if c.bias {
-            let bs_init = c.bs_init.unwrap_or_else(|| {
-                let bound = 1.0 / (in_dim as f64).sqrt();
-                super::Init::Uniform {
-                    lo: -bound,
-                    up: bound,
-                }
-            });
-            super::init::init(bs_init, &[out_dim])
-        } else {
-            Tensor::zeros(&[out_dim])
+    pub fn new(in_dim: usize, out_dim: usize) -> Self {
+        let options = LinearConfig {
+            in_features: in_dim,
+            out_features: out_dim,
+            ..LinearConfig::default()
         };
+        let mut self_ = Self {
+            ws: None,
+            bs: None,
+            options,
+        };
+        self_.reset();
+        self_
+    }
 
-        let ws = super::init::init(c.ws_init, &[out_dim, in_dim]);
+    fn reset(&mut self) {
+        let ws = Tensor::empty(&[self.options.out_features, self.options.in_features]);
         super::module::register_parameter(&ws, true);
-        super::module::register_parameter(&bs, true);
-        Linear { ws: ws, bs }
+        self.ws = Some(ws);
+        if self.options.bias {
+            let bs_ = Tensor::empty(&[self.options.out_features]);
+            super::module::register_parameter(&bs_, true);
+            self.bs = Some(bs_);
+        };
+        self.reset_parameters();
+    }
+    fn reset_parameters(&mut self) {
+        crate::nn::init::kaiming_uniform_(
+            self.ws.as_ref().unwrap(),
+            (5.0f64).sqrt(),
+            crate::nn::init::FanModeType::FanIn,
+            crate::nn::init::NonlinerityType::LeakyReLU,
+        );
+        if let Some(bs) = self.bs.as_ref() {
+            let (fan_in, _fan_out) =
+                crate::nn::init::calculate_fan_in_fan_out(self.ws.as_ref().unwrap());
+            let bound = 1.0 / (fan_in as f64).sqrt();
+            bs.uniform_(-bound, bound)
+        }
     }
 }
 
 impl super::module::Module for Linear {
     fn forward(&self, xs: &[&Tensor]) -> Tensor {
-        &xs[0].matmul(&self.ws.t(), true) + &self.bs
+        let result = xs[0].matmul(&self.ws.as_ref().unwrap().t(), true);
+        if let Some(bs) = self.bs.as_ref() {
+            result + bs.clone()
+        } else {
+            result
+        }
     }
 
     fn parameters(&self) -> Vec<Tensor> {
-        vec![self.ws.clone(), self.bs.clone()]
+        if self.bs.is_some() {
+            vec![
+                self.ws.as_ref().unwrap().clone(),
+                self.bs.as_ref().unwrap().clone(),
+            ]
+        } else {
+            vec![self.ws.as_ref().unwrap().clone()]
+        }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::{Linear, LinearConfig};
+    use super::Linear;
     use crate::autograd::backward;
     use crate::nn::Module;
     use crate::tensor::Tensor;
 
     #[test]
     fn linear_backward_test() {
-        let config = LinearConfig::default();
-        let linear = Linear::new(4, 3, config);
+        let linear = Linear::new(4, 3);
         let x = Tensor::from_scalar(&[2, 4], 1.5, true);
         let y = linear.forward(&[&x]);
         println!("Result: {:?}", y);

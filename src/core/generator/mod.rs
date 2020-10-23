@@ -1,42 +1,56 @@
 use std::fs::File;
 use std::io::Read;
 use std::primitive::u64;
-use std::sync::{Arc, Mutex};
+
 mod mt19937_engine;
 
-pub struct Generator<T: GeneratorImpl> {
-    impl_: Arc<Mutex<T>>,
+pub struct Generator {
+    impl_: Box<dyn GeneratorImpl>,
 }
 
-impl<T: GeneratorImpl> Clone for Generator<T> {
+impl Clone for Generator {
     fn clone(&self) -> Self {
-        let self_locked = self.impl_.lock().unwrap();
-        let clone = self_locked.clone();
-        Generator::new(clone)
+        Generator::new(self.impl_.clone_impl())
     }
 }
 
-impl<T: GeneratorImpl> Generator<T> {
-    pub fn new(gen_impl: T) -> Self {
-        Self {
-            impl_: Arc::new(Mutex::new(gen_impl)),
-        }
+impl Generator {
+    pub fn new(gen_impl: Box<dyn GeneratorImpl>) -> Self {
+        Self { impl_: gen_impl }
+    }
+
+    pub fn set_current_seed(&mut self, seed: u64) {
+        self.impl_.set_current_seed(seed)
+    }
+
+    pub fn current_seed(&self) -> u64 {
+        self.impl_.current_seed()
+    }
+
+    pub fn as_with_cpu_impl(&self) -> Generator {
+        Generator::new(Box::new(self.impl_.as_cpu_impl()))
     }
 }
 
 const DEFAULT_RNG_SEED_VAL: u64 = 67280421310721;
-pub trait GeneratorImpl {
-    fn random(&mut self) -> u32;
-    fn clone(&self) -> Self;
+pub trait GeneratorImpl: Send {
+    fn random(&self) -> u32;
+    fn random64(&self) -> u64;
     fn set_current_seed(&mut self, seed: u64);
     fn current_seed(&self) -> u64;
-    // fn clone_impl(&mut self) -> u32;
+    fn clone_impl(&self) -> Box<dyn GeneratorImpl>;
+    fn clone(&self) -> Box<dyn GeneratorImpl>;
+    fn as_cpu_impl(&self) -> CPUGeneratorImpl;
+    fn next_float_normal_sample(&self) -> Option<f32>;
+    fn set_next_float_normal_sample(&mut self, randn: Option<f32>);
+    fn next_double_normal_sample(&self) -> Option<f64>;
+    fn set_next_double_normal_sample(&mut self, randn: Option<f64>);
 }
 
 mod cpu_generator;
 pub use cpu_generator::*;
 
-pub fn make_generator<T: GeneratorImpl>(impl_: T) -> Generator<T> {
+pub fn make_generator(impl_: Box<dyn GeneratorImpl>) -> Generator {
     Generator::new(impl_)
 }
 
@@ -63,8 +77,9 @@ pub fn read_random_long() -> u64 {
     random_number
 }
 
-pub fn check_generator<T: GeneratorImpl>(gen: &Generator<T>) -> Arc<Mutex<T>> {
-    gen.impl_.clone()
+pub fn check_generator(gen: &mut Generator) -> &mut dyn GeneratorImpl {
+    let t = gen.impl_.as_mut();
+    t
 }
 
 #[cfg(test)]
@@ -73,103 +88,96 @@ mod test {
     use std::thread;
     #[test]
     fn test_read_urandom() {
-        println!("{}", read_random_long());
+        println!(
+            "Read Random Value from /dev/urandom: {}",
+            read_random_long()
+        );
     }
 
     #[test]
     fn test_cloning() {
         let mut gen1 = create_cpu_generator(None);
-
-        let cpu_gen1 = check_generator::<CPUGeneratorImpl>(&mut gen1);
-
         {
-            let mut cpu_gen1_locked = cpu_gen1.lock().unwrap();
-            println!("{}", cpu_gen1_locked.random());
-            println!("{}", cpu_gen1_locked.random());
+            let cpu_gen1 = check_generator(&mut gen1);
+            cpu_gen1.random();
+            cpu_gen1.random();
         }
 
         let mut gen2 = gen1.clone();
-        let cpu_gen2 = check_generator::<CPUGeneratorImpl>(&mut gen2);
-        let mut cpu_gen2_locked = cpu_gen2.lock().unwrap();
-        let mut cpu_gen1_locked = cpu_gen1.lock().unwrap();
-
-        assert_eq!(cpu_gen1_locked.random(), cpu_gen2_locked.random());
+        let cpu_gen2 = check_generator(&mut gen2);
+        let cpu_gen1 = check_generator(&mut gen1);
+        assert_eq!(cpu_gen1.random(), cpu_gen2.random());
     }
 
     #[test]
     fn test_multithreading_get_engine_operator() {
-        let gen1 = create_cpu_generator(None);
-        let cpu_gen1 = check_generator::<CPUGeneratorImpl>(&gen1);
-        let gen2;
-        {
-            gen2 = gen1.clone();
-        }
+        let mut gen1 = create_cpu_generator(None);
+
+        let mut gen2 = gen1.clone();
+
+        let cpu_gen1 = check_generator(&mut gen1);
 
         let cpu_gen1_clone1 = cpu_gen1.clone();
         let handle1 = thread::spawn(move || {
-            let mut impl_ = cpu_gen1_clone1.lock().unwrap();
-            impl_.random();
+            cpu_gen1_clone1.random();
         });
+
         let cpu_gen1_clone2 = cpu_gen1.clone();
         let handle2 = thread::spawn(move || {
-            let mut impl_ = cpu_gen1_clone2.lock().unwrap();
-            impl_.random();
+            cpu_gen1_clone2.random();
         });
+
         let cpu_gen1_clone3 = cpu_gen1.clone();
+
         let handle3 = thread::spawn(move || {
-            let mut impl_ = cpu_gen1_clone3.lock().unwrap();
-            impl_.random();
+            cpu_gen1_clone3.random();
         });
 
         let _ = handle1.join();
         let _ = handle2.join();
         let _ = handle3.join();
 
-        let cpu_gen2 = check_generator::<CPUGeneratorImpl>(&gen2);
-        cpu_gen2.lock().unwrap().random();
-        cpu_gen2.lock().unwrap().random();
-        cpu_gen2.lock().unwrap().random();
-        assert_eq!(
-            cpu_gen1.lock().unwrap().random(),
-            cpu_gen2.lock().unwrap().random()
-        );
+        let cpu_gen2 = check_generator(&mut gen2);
+        cpu_gen2.random();
+        cpu_gen2.random();
+        cpu_gen2.random();
+
+        let left = cpu_gen1.random();
+        let right = cpu_gen2.random();
+        assert_eq!(left, right);
     }
 
     #[test]
     fn test_set_get_current_seed() {
-        let foo = get_default_cpu_generator();
-        let mut impl_ = foo.impl_.lock().unwrap();
-        impl_.set_current_seed(123);
-        let current_seed = impl_.current_seed();
+        let  foo = get_default_cpu_generator();
+        foo.set_current_seed(123);
+        let current_seed = foo.current_seed();
         assert_eq!(current_seed, 123);
     }
 
     #[test]
     fn test_multithreading_get_set_current_seed() {
-        let gen1 = get_default_cpu_generator();
-        let initial_seed;
-        {
-            initial_seed = gen1.impl_.lock().unwrap().current_seed();
-        }
-        let cpu_gen = check_generator(&gen1);
+        let mut gen1 = get_default_cpu_generator();
+        let initial_seed = gen1.current_seed();
+        let cpu_gen = check_generator(&mut gen1);
 
-        let cpu_gen_clone1 = cpu_gen.clone();
+        let mut cpu_gen_clone1 = cpu_gen.clone();
         let handle1 = thread::spawn(move || {
-            let mut impl_ = cpu_gen_clone1.lock().unwrap();
-            let current_seed = impl_.current_seed();
-            impl_.set_current_seed(current_seed + 1);
+            // let mut impl_ = cpu_gen_clone1.lock().unwrap();
+            let current_seed = cpu_gen_clone1.current_seed();
+            cpu_gen_clone1.set_current_seed(current_seed + 1);
         });
 
-        let cpu_gen_clone2 = cpu_gen.clone();
+        let mut cpu_gen_clone2 = cpu_gen.clone();
         let handle2 = thread::spawn(move || {
-            let mut impl_ = cpu_gen_clone2.lock().unwrap();
-            let current_seed = impl_.current_seed();
-            impl_.set_current_seed(current_seed + 1);
+            // let mut impl_ = cpu_gen_clone2.lock().unwrap();
+            let current_seed = cpu_gen_clone2.current_seed();
+            cpu_gen_clone2.set_current_seed(current_seed + 1);
         });
 
         let _ = handle1.join();
         let _ = handle2.join();
-        let impl_ = cpu_gen.lock().unwrap();
-        assert_eq!(initial_seed + 2, impl_.current_seed())
+        // let impl_ = cpu_gen.lock().unwrap();
+        assert_eq!(initial_seed + 2, cpu_gen.current_seed())
     }
 }

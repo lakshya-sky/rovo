@@ -81,13 +81,12 @@ mod test {
     use super::{Optimizer, SGD};
     use crate::autograd::backward;
     use crate::nn::Module;
-    use crate::nn::{Functional, Linear, LinearConfig};
+    use crate::nn::{Functional, Linear};
     use crate::tensor::Tensor;
 
     #[test]
     fn test_sgd_step() {
-        let config = LinearConfig::default();
-        let linear = Linear::new(2, 1, config);
+        let linear = Linear::new(2, 1);
         let sigmoid = Functional::new(Functional::sigmoid());
         let mut sgd = SGD::new(linear.parameters());
         let x = Tensor::from_scalar(&[2, 2], 2.0, true);
