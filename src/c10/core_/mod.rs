@@ -19,6 +19,9 @@ pub use layout::*;
 mod memory_format;
 pub use memory_format::*;
 
+mod scalar_type;
+pub use scalar_type::*;
+
 pub fn allocator_init() {
     cpu_allocator::register_cpu_allocator();
 }

@@ -1,15 +1,15 @@
 use super::*;
+use once_cell::sync::OnceCell;
 use std::cell::RefCell;
 use std::mem;
 use std::ptr::NonNull;
 use std::rc::Rc;
-
 pub struct StorageImpl {
     data_ptr: DataPtr,
     size_bytes: usize,
     resizable: bool,
     received_cuda: bool,
-    allocator: *mut dyn Allocator,
+    allocator: Option<*mut dyn Allocator>,
 }
 
 impl StorageImpl {
@@ -29,8 +29,17 @@ impl StorageImpl {
             size_bytes,
             data_ptr,
             resizable,
-            allocator,
+            allocator: Some(allocator),
             received_cuda: false,
+        }
+    }
+    pub fn undefined_instance() -> Self {
+        Self {
+            data_ptr: DataPtr::default(),
+            size_bytes: 0,
+            received_cuda: false,
+            resizable: false,
+            allocator: None,
         }
     }
     pub fn reset(self) {
@@ -63,18 +72,37 @@ impl StorageImpl {
         data_ptr
     }
     pub fn allocator(&self) -> &mut dyn Allocator {
-        unsafe { &mut *self.allocator }
+        unsafe { &mut *self.allocator.unwrap() }
     }
     pub fn device(&self) -> Device {
         self.data_ptr.device()
     }
 }
 
+#[derive(Clone)]
 pub struct Storage {
     storage_impl: Rc<RefCell<StorageImpl>>,
 }
+unsafe impl Sync for Storage {}
+unsafe impl Send for Storage {}
+
+static SINGLETON: OnceCell<Storage> = OnceCell::new();
+
+impl Default for Storage {
+    fn default() -> Self {
+        let impl_ =
+            SINGLETON.get_or_init(|| Self::new_from_impl(StorageImpl::undefined_instance()));
+        impl_.clone()
+    }
+}
 
 impl Storage {
+    pub fn new_from_impl(impl_: StorageImpl) -> Self {
+        Self {
+            storage_impl: Rc::new(RefCell::new(impl_)),
+        }
+    }
+
     pub fn new(ptr: Rc<RefCell<StorageImpl>>) -> Self {
         Self { storage_impl: ptr }
     }
@@ -121,5 +149,16 @@ impl Storage {
     }
     pub fn device(&self) -> Device {
         self.storage_impl.borrow().device()
+    }
+}
+
+impl std::convert::From<StorageImpl> for Storage {
+    fn from(item: StorageImpl) -> Self {
+        Storage::new(Rc::new(RefCell::new(item)))
+    }
+}
+impl std::convert::From<&Self> for Storage {
+    fn from(item: &Self) -> Self {
+        item.clone()
     }
 }

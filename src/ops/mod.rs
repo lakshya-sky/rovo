@@ -5,9 +5,9 @@ pub use graph_ops::*;
 pub use graphroot::*;
 
 pub trait NodeTrait {
-    fn call(&mut self, input: Vec<Tensor>) -> Vec<Tensor>;
+    fn call(&mut self, input: Vec<NewTensor>) -> Vec<NewTensor>;
     fn set_next_edges(&mut self, edges: Vec<Edge>);
-    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize;
+    fn add_input_metadata(&mut self, tensor: &NewTensor) -> usize;
     fn next_edges(&self) -> Option<&EdgeList>;
     fn next_edge(&self, i: usize) -> Option<Edge>;
     fn num_inputs(&self) -> usize;
@@ -31,14 +31,14 @@ impl Node {
 }
 
 impl Node {
-    pub fn call(&mut self, input: Vec<Tensor>) -> Vec<Tensor> {
+    pub fn call(&mut self, input: Vec<NewTensor>) -> Vec<NewTensor> {
         self._impl.call(input)
     }
     pub fn set_next_edges(&mut self, edges: Vec<Edge>) {
         self._impl.set_next_edges(edges)
     }
 
-    pub fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+    pub fn add_input_metadata(&mut self, tensor: &NewTensor) -> usize {
         self._impl.add_input_metadata(tensor)
     }
 

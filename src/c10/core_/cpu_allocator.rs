@@ -64,7 +64,7 @@ mod test {
     fn test_cpu_allocation_deallocation() {
         unsafe {
             crate::init_rovo();
-            let allocator = crate::c10::get_allocator(DeviceType::CPU);
+            let allocator = crate::c10::get_cpu_allocator();
             {
                 let _ = (&*allocator).allocate(4);
             }

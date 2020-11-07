@@ -26,7 +26,7 @@ impl NodeTrait for GraphRoot {
         todo!()
     }
 
-    fn add_input_metadata(&mut self, _tensor: &Tensor) -> usize {
+    fn add_input_metadata(&mut self, _tensor: &NewTensor) -> usize {
         todo!()
     }
 

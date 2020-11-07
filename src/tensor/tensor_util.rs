@@ -1,4 +1,4 @@
-#[inline]
+#[inline(always)]
 pub fn maybe_wrap_dim(dim: i64, dim_post_expr: i64, _wrap_scalr: bool) -> usize {
     let mut dim = dim;
     let mut dim_post_expr = dim_post_expr;
@@ -22,7 +22,7 @@ pub fn maybe_wrap_dim(dim: i64, dim_post_expr: i64, _wrap_scalr: bool) -> usize 
     dim as usize
 }
 
-#[inline]
+#[inline(always)]
 pub fn infer_size(a: &[usize], b: &[usize]) -> Vec<usize> {
     // eprintln!("a: {:?}, b: {:?}", a, b);
     let dims_a = a.len();

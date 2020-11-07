@@ -1,4 +1,4 @@
-#[derive(Debug, Clone)]
+#[derive(Copy, Debug, Clone, PartialEq)]
 pub enum Layout {
     Strided,
     Sparse,

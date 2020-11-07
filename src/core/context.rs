@@ -27,6 +27,6 @@ pub fn manual_seed(seed: u64) {
     gen.set_current_seed(seed);
 }
 
-pub fn getCPUAllocator()->*mut dyn crate::c10::Allocator{
+pub fn get_cpu_allocator() -> *mut dyn crate::c10::Allocator {
     crate::c10::get_cpu_allocator()
 }

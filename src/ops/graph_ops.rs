@@ -1,16 +1,16 @@
-use crate::autograd::SavedTensor;
+use crate::autograd::*;
 use crate::ops::NodeTrait;
 use crate::tensor::*;
 use smallvec::*;
 
 pub struct AccumulateGrad {
-    tensor: Tensor,
+    tensor: NewTensor,
     next_edges: Option<Vec<Edge>>,
     input_metadata_: SmallVec<[InputMetaData; 2]>,
 }
 
 impl AccumulateGrad {
-    pub fn new(tensor: Tensor) -> Self {
+    pub fn new(tensor: NewTensor) -> Self {
         let input_metadata: SmallVec<[_; 2]> = smallvec![InputMetaData::from_tensor(&tensor)];
 
         Self {
@@ -22,25 +22,25 @@ impl AccumulateGrad {
 }
 
 impl NodeTrait for AccumulateGrad {
-    fn call(&mut self, grads: Vec<Tensor>) -> Vec<Tensor> {
+    fn call(&mut self, grads: Vec<NewTensor>) -> Vec<NewTensor> {
         // println!(
-        //     "calling AccumulateGrad for Tensor: {:?}",
+        //     "calling AccumulateGrad for NewTensor: {:?}",
         //     self.tensor
         // );
         let new_grad = &grads[0];
         let grad = self.tensor.grad();
         if let Some(g) = grad {
-            let t = g.borrow().clone();
+            let t = g.clone();
             self.tensor.set_grad(&t + new_grad);
         } else {
-            let t = Tensor::new(new_grad);
+            let t = NewTensor::new(new_grad);
             self.tensor.set_grad(t);
         }
         Vec::new()
     }
 
     fn set_next_edges(&mut self, _edges: Vec<Edge>) {}
-    fn add_input_metadata(&mut self, _tensor: &Tensor) -> usize {
+    fn add_input_metadata(&mut self, _tensor: &NewTensor) -> usize {
         todo!()
     }
     fn next_edges(&self) -> Option<&EdgeList> {
@@ -75,7 +75,7 @@ pub struct InputMetaData {
 }
 
 impl InputMetaData {
-    fn from_tensor(t: &Tensor) -> InputMetaData {
+    fn from_tensor(t: &NewTensor) -> InputMetaData {
         InputMetaData {
             size: SmallVec::from_slice(t.sizes()),
             device: 0,
@@ -93,7 +93,7 @@ pub struct AddBackwardTensors {
 }
 
 impl NodeTrait for AddBackwardTensors {
-    fn call(&mut self, mut grads: Vec<Tensor>) -> Vec<Tensor> {
+    fn call(&mut self, mut grads: Vec<NewTensor>) -> Vec<NewTensor> {
         let _tmp: Vec<_> = grads.drain(1..).collect();
         let grad = grads.get(0).unwrap().clone();
         let grad_1 = grad.clone();
@@ -105,7 +105,7 @@ impl NodeTrait for AddBackwardTensors {
         self.next_edges = Some(edges)
     }
 
-    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+    fn add_input_metadata(&mut self, tensor: &NewTensor) -> usize {
         let input_nr = self.input_metadata_.len();
         self.input_metadata_
             .push(InputMetaData::from_tensor(tensor));
@@ -145,7 +145,7 @@ pub struct MulBackwardTensors {
 }
 
 impl NodeTrait for MulBackwardTensors {
-    fn call(&mut self, grads: Vec<Tensor>) -> Vec<Tensor> {
+    fn call(&mut self, grads: Vec<NewTensor>) -> Vec<NewTensor> {
         let grad = grads.first().unwrap();
         let self_ = self._self.as_ref().unwrap().unpack();
         let other = self.other.as_ref().unwrap().unpack();
@@ -160,7 +160,7 @@ impl NodeTrait for MulBackwardTensors {
         self.next_edges = Some(edges)
     }
 
-    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+    fn add_input_metadata(&mut self, tensor: &NewTensor) -> usize {
         let input_nr = self.input_metadata_.len();
         self.input_metadata_
             .push(InputMetaData::from_tensor(tensor));
@@ -199,7 +199,7 @@ pub struct AddBackwardScalar {
 }
 
 impl NodeTrait for AddBackwardScalar {
-    fn call(&mut self, grads: Vec<Tensor>) -> Vec<Tensor> {
+    fn call(&mut self, grads: Vec<NewTensor>) -> Vec<NewTensor> {
         let grad = grads.first().unwrap();
         vec![grad.clone()]
     }
@@ -208,7 +208,7 @@ impl NodeTrait for AddBackwardScalar {
         self.next_edges = Some(edges)
     }
 
-    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+    fn add_input_metadata(&mut self, tensor: &NewTensor) -> usize {
         let input_nr = self.input_metadata_.len();
         self.input_metadata_
             .push(InputMetaData::from_tensor(tensor));
@@ -250,7 +250,7 @@ pub struct MulBackwardScalar {
 }
 
 impl NodeTrait for MulBackwardScalar {
-    fn call(&mut self, grads: Vec<Tensor>) -> Vec<Tensor> {
+    fn call(&mut self, grads: Vec<NewTensor>) -> Vec<NewTensor> {
         let grad = grads.first().unwrap();
         let other = self.other;
 
@@ -263,7 +263,7 @@ impl NodeTrait for MulBackwardScalar {
         self.next_edges = Some(edges)
     }
 
-    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+    fn add_input_metadata(&mut self, tensor: &NewTensor) -> usize {
         let input_nr = self.input_metadata_.len();
         self.input_metadata_
             .push(InputMetaData::from_tensor(tensor));
@@ -303,7 +303,7 @@ pub struct SubBackwardTensors {
 }
 
 impl NodeTrait for SubBackwardTensors {
-    fn call(&mut self, mut grads: Vec<Tensor>) -> Vec<Tensor> {
+    fn call(&mut self, mut grads: Vec<NewTensor>) -> Vec<NewTensor> {
         let _tmp: Vec<_> = grads.drain(1..).collect();
         let grad = grads.get(0).unwrap().clone();
         let grad_1 = grad.clone();
@@ -315,7 +315,7 @@ impl NodeTrait for SubBackwardTensors {
         self.next_edges = Some(edges)
     }
 
-    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+    fn add_input_metadata(&mut self, tensor: &NewTensor) -> usize {
         let input_nr = self.input_metadata_.len();
         self.input_metadata_
             .push(InputMetaData::from_tensor(tensor));
@@ -357,7 +357,7 @@ pub struct DivBackwardTensors {
 }
 
 impl NodeTrait for DivBackwardTensors {
-    fn call(&mut self, grads: Vec<Tensor>) -> Vec<Tensor> {
+    fn call(&mut self, grads: Vec<NewTensor>) -> Vec<NewTensor> {
         let grad = grads.first().unwrap();
         let self_ = self._self.as_ref().unwrap().unpack();
         let other = self.other.as_ref().unwrap().unpack();
@@ -372,7 +372,7 @@ impl NodeTrait for DivBackwardTensors {
         self.next_edges = Some(edges)
     }
 
-    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+    fn add_input_metadata(&mut self, tensor: &NewTensor) -> usize {
         let input_nr = self.input_metadata_.len();
         self.input_metadata_
             .push(InputMetaData::from_tensor(tensor));
@@ -412,7 +412,7 @@ pub struct NegBackward {
 }
 
 impl NodeTrait for NegBackward {
-    fn call(&mut self, input: Vec<Tensor>) -> Vec<Tensor> {
+    fn call(&mut self, input: Vec<NewTensor>) -> Vec<NewTensor> {
         let grad_input = input.first().unwrap();
         let grad_result = -grad_input;
         vec![grad_result]
@@ -422,7 +422,7 @@ impl NodeTrait for NegBackward {
         self.next_edges = Some(edges)
     }
 
-    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+    fn add_input_metadata(&mut self, tensor: &NewTensor) -> usize {
         let input_nr = self.input_metadata_.len();
         self.input_metadata_
             .push(InputMetaData::from_tensor(tensor));
@@ -462,7 +462,7 @@ pub struct TBackward {
 }
 
 impl NodeTrait for TBackward {
-    fn call(&mut self, input: Vec<Tensor>) -> Vec<Tensor> {
+    fn call(&mut self, input: Vec<NewTensor>) -> Vec<NewTensor> {
         let grad_input = input.first().unwrap();
         let grad_result = grad_input.t();
         vec![grad_result]
@@ -472,7 +472,7 @@ impl NodeTrait for TBackward {
         self.next_edges = Some(edges)
     }
 
-    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+    fn add_input_metadata(&mut self, tensor: &NewTensor) -> usize {
         let input_nr = self.input_metadata_.len();
         self.input_metadata_
             .push(InputMetaData::from_tensor(tensor));
@@ -521,7 +521,7 @@ pub struct MmBackward {
 }
 
 impl NodeTrait for MmBackward {
-    fn call(&mut self, grads: Vec<Tensor>) -> Vec<Tensor> {
+    fn call(&mut self, grads: Vec<NewTensor>) -> Vec<NewTensor> {
         let grad = grads.first().unwrap();
         let mat1 = self.self_.as_ref().unwrap().unpack();
         let mat2 = self.mat2_.as_ref().unwrap().unpack();
@@ -540,7 +540,7 @@ impl NodeTrait for MmBackward {
         self.next_edges = Some(edges)
     }
 
-    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+    fn add_input_metadata(&mut self, tensor: &NewTensor) -> usize {
         let input_nr = self.input_metadata_.len();
         self.input_metadata_
             .push(InputMetaData::from_tensor(tensor));
@@ -581,7 +581,7 @@ pub struct SigmoidBackward {
 }
 
 impl NodeTrait for SigmoidBackward {
-    fn call(&mut self, input: Vec<Tensor>) -> Vec<Tensor> {
+    fn call(&mut self, input: Vec<NewTensor>) -> Vec<NewTensor> {
         let grad_input = input.first().unwrap();
         let result = self.result_.as_ref().unwrap().unpack();
         let grad_result = (-&result + 1.0) * &result * grad_input;
@@ -592,7 +592,7 @@ impl NodeTrait for SigmoidBackward {
         self.next_edges = Some(edges)
     }
 
-    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+    fn add_input_metadata(&mut self, tensor: &NewTensor) -> usize {
         let input_nr = self.input_metadata_.len();
         self.input_metadata_
             .push(InputMetaData::from_tensor(tensor));
@@ -649,7 +649,7 @@ impl Default for BinaryCrossEntropyBackward {
 }
 
 impl NodeTrait for BinaryCrossEntropyBackward {
-    fn call(&mut self, input: Vec<Tensor>) -> Vec<Tensor> {
+    fn call(&mut self, input: Vec<NewTensor>) -> Vec<NewTensor> {
         let grad_input = input.first().unwrap();
         let self_ = self.self_.as_ref().unwrap().unpack();
         let target_ = self.target_.as_ref().unwrap().unpack();
@@ -668,7 +668,7 @@ impl NodeTrait for BinaryCrossEntropyBackward {
         self.next_edges = Some(edges)
     }
 
-    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+    fn add_input_metadata(&mut self, tensor: &NewTensor) -> usize {
         let input_nr = self.input_metadata_.len();
         self.input_metadata_
             .push(InputMetaData::from_tensor(tensor));
@@ -710,14 +710,10 @@ pub struct MeanBackward {
 }
 
 impl NodeTrait for MeanBackward {
-    fn call(&mut self, input: Vec<Tensor>) -> Vec<Tensor> {
+    fn call(&mut self, input: Vec<NewTensor>) -> Vec<NewTensor> {
         let grad_input = input.first().unwrap();
         let mut result = grad_input.expand(self.self_sizes.as_slice());
-        result.div_(&Tensor::from_scalar(
-            result.sizes(),
-            self.self_numel as f64,
-            false,
-        ));
+        result.div_(&full(result.sizes(), self.self_numel as f32, None));
         vec![result]
     }
 
@@ -725,7 +721,7 @@ impl NodeTrait for MeanBackward {
         self.next_edges = Some(edges)
     }
 
-    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+    fn add_input_metadata(&mut self, tensor: &NewTensor) -> usize {
         let input_nr = self.input_metadata_.len();
         self.input_metadata_
             .push(InputMetaData::from_tensor(tensor));

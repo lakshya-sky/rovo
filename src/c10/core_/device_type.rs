@@ -1,12 +1,13 @@
 #[derive(Debug, Copy, Clone)]
 pub enum DeviceType {
-    CPU = 0,
-    CUDA = 1,
+    CPU,
+    CUDA,
+    COMPILE_TIME_MAX_DEVICE_TYPE,
 }
 pub const KCPU: DeviceType = DeviceType::CPU;
 pub const KCUDA: DeviceType = DeviceType::CUDA;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Device {
     type_: DeviceType,
     index: i16,
@@ -27,5 +28,11 @@ impl Device {
             type_,
             index: index.unwrap_or(-1),
         }
+    }
+}
+
+impl From<DeviceType> for Device {
+    fn from(device_type: DeviceType) -> Self {
+        Device::new(device_type, None)
     }
 }

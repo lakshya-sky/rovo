@@ -1,3 +1,4 @@
+use super::*;
 use crate::engine::Engine;
 use crate::tensor::*;
 use crate::util_autograd;
@@ -33,87 +34,12 @@ fn _make_grads(outputs: &VariableList, grad_outputs: &VariableList) -> VariableL
     let mut new_grads: VariableList = vec![];
     new_grads.reserve(num_tensors);
     if grad_outputs.is_empty() {
-        
         for output in outputs {
             if output.requires_grad() {
                 // println!("Pushing new Grads to GradList");
-                new_grads.push(Tensor::ones_like(output))
+                new_grads.push(ones_like(output, TensorOptions::default()))
             }
         }
     }
     new_grads
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    #[test]
-    fn test_backward_add() {
-        let t = Tensor::from_scalar(&[2, 2], 2.0, true);
-        let x = Tensor::from_scalar(&[2, 2], 1.0, true);
-        let res: Tensor = &t + &x;
-
-        backward(&vec![res], &vec![], false);
-        // t.grad().unwrap();
-        println!("{:?}", t.grad().unwrap().as_ref());
-        // println!("{}", x.grad().unwrap().as_ref()._impl.borrow().data);
-    }
-    #[test]
-    fn test_backward_mul() {
-        let t = Tensor::from_scalar(&[2, 2], 7.0, true);
-        let x = Tensor::from_scalar(&[2, 2], 3.0, true);
-        let res: Tensor = &t * &x;
-
-        backward(&vec![res], &vec![], false);
-        // t.grad().unwrap();
-        println!("{:?}", t.grad().unwrap().as_ref());
-        println!("{:?}", x.grad().unwrap().as_ref());
-    }
-
-    #[test]
-    fn test_backward_mul_add() {
-        let t = Tensor::from_scalar(&[2, 2], 7.0, true);
-        let x = Tensor::from_scalar(&[2, 2], 3.0, true);
-        let add: Tensor = &t + &x;
-        let mul = &x * &add;
-        backward(&vec![mul], &vec![], false);
-        // t.grad().unwrap();
-        println!("{:?}", t.grad().unwrap().as_ref());
-        println!("{:?}", x.grad().unwrap().as_ref());
-    }
-
-    #[test]
-    fn test_backward_sub_div() {
-        let t = Tensor::from_scalar(&[2, 2], 7.0, true);
-        let x = Tensor::from_scalar(&[2, 2], 3.0, true);
-        let div = &t / &x;
-        let sub = &x - &div;
-        backward(&vec![sub], &vec![], false);
-        // t.grad().unwrap();
-        println!("{:?}", t.grad().unwrap().as_ref());
-        println!("{:?}", x.grad().unwrap().as_ref());
-    }
-
-    #[test]
-    fn test_mm() {
-        let x = Tensor::from_scalar(&[1, 2], 2.0, true);
-        let w = Tensor::from_scalar(&[2, 2], 3.0, true);
-        let result = x.mm(&w, true);
-        backward(&vec![result], &vec![], false);
-        // t.grad().unwrap();
-        println!("{:?}", x.grad().unwrap().as_ref());
-        println!("{:?}", w.grad().unwrap().as_ref());
-    }
-
-    #[test]
-    fn test_matmul() {
-        let x = Tensor::from_scalar(&[1, 2], 2.0, true);
-        let w = Tensor::from_scalar(&[1, 2], 3.0, true);
-        let b = Tensor::from_scalar(&[1], 3.0, true);
-        let result = x.matmul(&w.t(), true) + b;
-        backward(&vec![result], &vec![], false);
-        // t.grad().unwrap();
-        println!("{:?}", x.grad().unwrap().as_ref());
-        println!("{:?}", w.grad().unwrap().as_ref());
-    }
 }

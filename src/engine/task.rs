@@ -72,7 +72,7 @@ impl InputBuffer {
         other.buffer
     }
 
-    pub fn add(&mut self, pos: usize, tensor: Tensor) {
+    pub fn add(&mut self, pos: usize, tensor: NewTensor) {
         assert!(pos < self.buffer.capacity());
         match self.buffer.get(pos) {
             Some(_) => accumulate(&mut self.buffer, pos, tensor),
@@ -81,7 +81,7 @@ impl InputBuffer {
     }
 }
 
-pub fn accumulate(buffer: &mut VariableList, pos: usize, tensor: Tensor) {
+pub fn accumulate(buffer: &mut VariableList, pos: usize, tensor: NewTensor) {
     let old_var = buffer.remove(pos);
     //Todo: use sparse tensor logic. currently performs basic accumulation
     buffer.insert(pos, old_var + tensor);

@@ -1,34 +1,18 @@
 # Rovo
 
-## Experimental Tensor Libary in Rust inspired from Pytorch.
+## Experimental NewTensor Libary in Rust inspired from Pytorch.
 
 Last:
 
-- Insted of type UniqueVoidPointer use struct with explicit type as c_void.
+- Handle case where iterator has no output. loops.rs:execute_op
 
 To-do:
 
-- [x] Use not_ready for evaluation of function.
-- [x] Impl -, /, and unary -.
-- [x] Basic Linear Layer.
-- [x] function for comparing two tensors. (shallow_comapre that compares only data and shape)
-- [x] Random number Generator. (for CPU only)
-- [x] Allow seed with manual_seed.
-- [ ] basic Optimizer
-  - [x] SGD
-  - [ ] Adam
-- [-] TensorIterator and TensorInteratorConfig.
-- [ ] overload [] operator for Tensor. https://doc.rust-lang.org/src/alloc/vec.rs.html#1970-1977
-- [ ] Binary_Cross_Entropy.
-- [ ] Impl OrderedDict similiar to python's.
-- [ ] Pow, Exp operators.
-- [ ] Improve Debug trait impls.
-- [ ] Improve sum() & view() methods.
-- [ ] Use queue for evaluate_outputs.
-
-Corner-cases:
-
-- [ ] RTTI for module name inference.
+- [x] Empty tensor creation.
+- [x] Read NewTensor by index and print NewTensor.
+  - Index trait for [] enforces to return reference while we need value, hence I am using Get trait to get tensor content using get() method.
+- [ ] Make distributions consistent with Pytorch.
+- [ ] Check for backprop and make it consistent with Pytorch.
 
 Notes:
 

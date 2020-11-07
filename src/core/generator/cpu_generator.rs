@@ -147,9 +147,10 @@ pub fn create_cpu_generator(seed: Option<u64>) -> Generator {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::core::*;
+    use crate::aten::native::cpu::distribution_templates::*;
+    use crate::autograd;
+    use crate::core::generator::*;
     use crate::tensor::*;
-    use std::mem::MaybeUninit;
 
     #[derive(Clone)]
     struct TestCPUGenerator {
@@ -216,149 +217,38 @@ mod test {
 
     const MAGIC_NUMBER: u64 = 424242424242424242;
 
-    pub fn maybe_get_next_double_normal_sample<T: num::cast::NumCast>(
-        gen: &mut dyn GeneratorImpl,
-        ret: *mut T,
-    ) -> bool {
-        if let Some(rt) = gen.next_double_normal_sample() {
-            unsafe {
-                *ret = num::cast(rt).unwrap();
-            }
-            gen.set_next_double_normal_sample(None);
-            return true;
-        }
-        false
-    }
-
-    pub fn maybe_get_next_float_normal_sample<T: num::cast::NumCast>(
-        gen: &mut dyn GeneratorImpl,
-        ret: *mut T,
-    ) -> bool {
-        if let Some(rt) = gen.next_float_normal_sample() {
-            unsafe {
-                *ret = num::cast(rt).unwrap();
-            }
-            gen.set_next_float_normal_sample(None);
-            return true;
-        }
-        false
-    }
-
-    pub fn maybe_set_next_double_normal_sample<T: num::cast::NumCast>(
-        gen: &mut dyn GeneratorImpl,
-        ret: T,
-    ) {
-        gen.set_next_double_normal_sample(Some(num::cast(ret).unwrap()));
-    }
-
-    pub fn maybe_set_next_float_normal_sample<T: num::cast::NumCast>(
-        gen: &mut dyn GeneratorImpl,
-        ret: T,
-    ) {
-        gen.set_next_float_normal_sample(Some(num::cast(ret).unwrap()));
-    }
-
-    struct NormalDistribution<T> {
-        mean: T,
-        std: T,
-    }
-
-    impl<T> NormalDistribution<T>
-    where
-        T: std::ops::Mul<Output = T>
-            + std::ops::Add<Output = T>
-            + From<f32>
-            + Copy
-            + std::ops::Sub<Output = T>
-            + num::cast::NumCast
-            + num_traits::Float,
-    {
-        pub fn new(mean: T, std: T) -> Self {
-            Self { mean, std }
-        }
-
-        pub fn call(&self, gen: &mut dyn GeneratorImpl) -> T {
-            let mut ret = MaybeUninit::<T>::uninit();
-            let type_name = std::any::type_name::<T>();
-            if type_name == "f64" {
-                if maybe_get_next_double_normal_sample(gen, ret.as_mut_ptr()) {
-                    let ret = unsafe { ret.assume_init() };
-                    return transformation_helper::normal(ret, self.mean, self.std);
-                }
-            } else {
-                if maybe_get_next_float_normal_sample(gen, ret.as_mut_ptr()) {
-                    let ret = unsafe { ret.assume_init() };
-                    return transformation_helper::normal(ret, self.mean, self.std);
-                }
-            }
-            let uniform = UniformRealDistribution::<T>::new(0.0.into(), 1.0.into());
-            // 0.10037074167330773
-            let u1 = uniform.call(gen);
-            let u2 = uniform.call(gen);
-            // 0.45994029116614604
-            let r: T = (num::cast::<_, T>(-2.0).unwrap()
-                * (num::cast::<_, T>(1.0).unwrap() - u2).ln())
-            .sqrt();
-            let theta: T = num::cast::<_, T>(2.0 * std::f64::consts::PI).unwrap() * u1;
-            if type_name == "f64" {
-                maybe_set_next_double_normal_sample(gen, r * theta.sin())
-            } else {
-                maybe_set_next_float_normal_sample(gen, r * theta.sin())
-            }
-            let ret = r * theta.cos();
-            let result = transformation_helper::normal(ret, self.mean, self.std);
-            result
-        }
-    }
-
-    pub fn normal_kernel(self_: &Tensor, mean: f64, std: f64, gen: &mut dyn GeneratorImpl) {
-        let iter = crate::tensor::TensorIterator::nullary_op(self_);
-        let closure = move || {
-            let normal = NormalDistribution::new(mean, std);
-            normal.call(gen)
-        };
-        crate::aten::native::cpu_serial_kernel(iter, closure);
-    }
-
-    struct NormalKernel;
-
-    impl NormalKernel {
-        pub fn call(&self, self_: &Tensor, mean: f64, std: f64, gen: Option<&mut Generator>) {
-            normal_kernel(self_, mean, std, check_generator(gen.unwrap()))
-        }
-    }
-
     fn normal<'a>(
-        tensor: &'a Tensor,
+        tensor: &'a NewTensor,
         mean: f64,
         std: f64,
         gen: Option<&mut Generator>,
-    ) -> &'a Tensor {
+    ) -> &'a NewTensor {
         let normal_kernel = NormalKernel;
         normal_impl_(normal_kernel, tensor, mean, std, gen)
     }
 
     fn normal_impl_<'a>(
         kernel: NormalKernel,
-        self_: &'a Tensor,
+        self_: &'a NewTensor,
         mean: f64,
         std: f64,
         gen: Option<&mut Generator>,
-    ) -> &'a Tensor {
+    ) -> &'a NewTensor {
         kernel.call(self_, mean, std, gen);
         self_
     }
 
     #[test]
     fn rngtest_normal() {
+        crate::init_rovo();
         let mean = 123.45;
         let std = 67.89;
         let mut gen = super::super::make_generator(Box::new(TestCPUGenerator::new(MAGIC_NUMBER)));
-        let actual = Tensor::empty(&[10]);
+        let actual = autograd::empty(&[10], None, None);
         let _ = normal(&actual, mean, std, Some(&mut gen));
-        let expected = Tensor::empty_like(&actual);
+        let expected = autograd::empty_like(&actual, None, None);
         normal_kernel(&expected, mean, std, check_generator(&mut gen));
-
+        println!("Actual: {:?}\nExpected: {:?}", actual, expected);
         // Todo: Needs to vefiry that both tensor are equal or close to equal by tolerance.
         // Function similar to below should be used to achive the purpose.
         // assert!(all_close(&actual, &expected));

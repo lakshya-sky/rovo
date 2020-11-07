@@ -1,3 +1,4 @@
+use super::{make_variable, make_variable_with_edge};
 use crate::ops::*;
 use crate::tensor::*;
 use crate::util_autograd;
@@ -5,7 +6,7 @@ use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
 pub struct SavedTensor {
-    data: Tensor,
+    data: NewTensor,
     grad_accumulator: Option<Weak<RefCell<Node>>>,
     grad_fn: Option<Rc<RefCell<Node>>>,
     saved_version: u32,
@@ -17,7 +18,7 @@ pub struct SavedTensor {
 }
 
 impl SavedTensor {
-    pub fn new(tensor: &Tensor, is_output: bool) -> Self {
+    pub fn new(tensor: &NewTensor, is_output: bool) -> Self {
         let was_default_constructed = false;
         let output_nr = tensor.output_nr();
         let requires_grad = tensor.requires_grad();
@@ -47,7 +48,7 @@ impl SavedTensor {
         }
     }
 
-    pub fn new_consume(tensor: Tensor, is_output: bool) -> Self {
+    pub fn new_consume(tensor: NewTensor, is_output: bool) -> Self {
         let was_default_constructed = false;
         let output_nr = tensor.output_nr();
         let requires_grad = tensor.requires_grad();
@@ -75,19 +76,19 @@ impl SavedTensor {
         }
     }
 
-    pub fn unpack(&self) -> Tensor {
+    pub fn unpack(&self) -> NewTensor {
         if self.saved_version != self.version_counter.current_version() {
             panic!()
         }
 
-        let mut tensor: Tensor;
+        let mut tensor: NewTensor;
         if let Some(grad_fn) = &self.grad_fn {
-            tensor = Tensor::make_variable(
+            tensor = make_variable_with_edge(
                 self.data.clone(),
                 Edge::new(Some(grad_fn.clone()), self.output_nr),
             )
         } else {
-            tensor = Tensor::make_variable_without_edge(self.data.clone(), self.requires_grad);
+            tensor = make_variable(self.data.clone(), self.requires_grad);
         }
 
         util_autograd::TensorHook::set_version_counter(

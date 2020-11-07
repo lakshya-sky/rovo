@@ -1,11 +1,14 @@
-use super::{NewTensor, Tensor};
-use crate::c10::MemoryFormat;
+use super::NewTensor;
+use crate::aten;
+use crate::autograd;
+use crate::c10::{can_cast, Device, ScalarType, KCPU};
+
 use std::{ffi::c_void, ptr::NonNull};
 type DimVector = smallvec::SmallVec<[usize; 5]>;
 type StrideVector = smallvec::SmallVec<[usize; 6]>;
 type LOOP = fn(&[NonNull<u8>], &[usize], usize);
 type LOOP2D = fn(&[NonNull<u8>], &[usize], usize, usize);
-// For now using Tensor type as OperandInfo, but when Tensor supports other types
+// For now using NewTensor type as OperandInfo, but when NewTensor supports other types
 // This needs to have a new struct similar to pytorch.
 
 struct DimCounter<'a, 'b> {
@@ -78,314 +81,51 @@ impl<'a, 'b> DimCounter<'a, 'b> {
         [step0, step1]
     }
 }
-struct OperandInfo {
-    is_output: bool,
-    tensor: Tensor,
-}
 
-impl OperandInfo {
-    pub fn new(tensor: Tensor) -> Self {
-        Self {
-            is_output: false,
-            tensor,
-        }
-    }
-}
-
-// TensorIterator currently doesn't support the feature of having a Tensor
-// both as an input and output.
-#[derive(Default)]
-pub struct TensorIterator {
-    shape_: DimVector,
-    oprands_: smallvec::SmallVec<[OperandInfo; 4]>,
-    num_outputs_: usize,
-    all_ops_same_shape_: bool,
-    is_reduction_: bool,
-}
-
-impl TensorIterator {
-    pub fn build(config: &TensorIteratorConfig) -> Self {
-        let mut self_ = Self::default();
-        self_.populate_operands(config);
-        self_.compute_shape(config);
-        self_.resize_outputs(config);
-        self_.resize_inputs(config);
-        self_
-    }
-
-    fn populate_operands(&mut self, config: &TensorIteratorConfig) {
-        // Pytorch has both populate_operands and mark_tensor methods for filling
-        // tensors in iterator, but here I am using only this method for both tasks.
-        self.num_outputs_ = config.num_outputs_;
-        for i in 0..config.tensors_.len() {
-            self.oprands_
-                .push(OperandInfo::new(config.tensors_[i].clone()));
-        }
-
-        // mark_outputs method is implemented here.
-        for i in 0..self.num_outputs_ {
-            self.oprands_[i].is_output = true;
-        }
-    }
-
-    fn compute_shape(&mut self, config: &TensorIteratorConfig) {
-        if let Some(static_shape_) = config.static_shape_.as_ref() {
-            self.shape_ = static_shape_.clone();
-        } else {
-            self.all_ops_same_shape_ = true;
-            let mut has_scalars = false;
-            let mut has_tensors = false;
-            for op in &(self.oprands_) {
-                if config.resize_outputs_ && op.is_output {
-                    continue;
-                }
-                let shape = op.tensor.sizes();
-                if shape.len() == 0 {
-                    has_scalars = true;
-                } else {
-                    has_tensors = true;
-                }
-                if has_scalars && has_tensors {
-                    self.all_ops_same_shape_ = false;
-                }
-                if self.shape_.is_empty() {
-                    self.shape_.extend_from_slice(shape);
-                } else if shape != self.shape_.as_slice() {
-                    self.all_ops_same_shape_ = false;
-                    let tmp = super::tensor_util::infer_size(self.shape_.as_slice(), shape);
-                    self.shape_.copy_from_slice(tmp.as_slice());
-                }
-                // eprintln!("Iter Shape: {:?}", self.shape_);
-                // eprintln!("Oprands have same shape? {}", self.all_ops_same_shape_);
-            }
-        }
-    }
-
-    pub fn resize_outputs(&self, config: &TensorIteratorConfig) {
-        if config.static_shape_.is_none() {
-            for i in 0..self.num_outputs_ {
-                let tensor = &self.oprands_[i].tensor;
-                tensor.get_tensor_impl().data = tensor
-                    .get_tensor_impl()
-                    .data
-                    .clone()
-                    .into_shape(self.shape_.as_slice())
-                    .unwrap();
-                assert_eq!(
-                    tensor.sizes(),
-                    self.shape_.as_slice(),
-                    "Yet to implement output resizing for TensorIterator"
-                );
-            }
-        }
-    }
-
-    pub fn resize_inputs(&self, config: &TensorIteratorConfig) {
-        if config.static_shape_.is_none() {
-            for i in self.num_outputs_..self.oprands_.len() {
-                let tensor = &self.oprands_[i].tensor;
-                tensor.get_tensor_impl().data = tensor
-                    .get_tensor_impl()
-                    .data
-                    .broadcast(self.shape_.as_slice())
-                    .unwrap()
-                    .into_owned();
-                assert_eq!(
-                    tensor.sizes(),
-                    self.shape_.as_slice(),
-                    "Yet to implement output resizing for TensorIterator"
-                );
-            }
-        }
-    }
-
-    pub fn for_each(&self, op: impl Fn(&f64, &f64) -> f64) {
-        // For each assumes that there is only single output right now
-        // and the accepted closure accepts only two inputs
-
-        let output = &self.oprands_.first().unwrap().tensor;
-        let first_in = &self.oprands_.get(1).unwrap().tensor;
-        let second_in = &self.oprands_.get(2).unwrap().tensor;
-        let out_numel = output.numel();
-        assert!(
-            (out_numel == first_in.numel()) && (out_numel == second_in.numel()),
-            "oprands should have same number of elements"
-        );
-
-        // let mut out_iter = output.get_tensor_impl().data.iter_mut();
-        let mut first_iter = first_in.get_tensor_impl().data.iter();
-        let mut second_iter = second_in.get_tensor_impl().data.iter();
-        let sizes = output.sizes();
-
-        // Todo: here it is assumed that each operand is only two dimentional
-        // extend it to handle any dimensions.
-        // let rows = sizes[0];
-        let columns = sizes[1];
-        let mut row;
-        let mut col;
-        let mut i = 0usize;
-        loop {
-            match (first_iter.next(), second_iter.next()) {
-                (Some(x), Some(y)) => {
-                    let result = op(x, y);
-                    row = i / columns;
-                    col = i % columns;
-                    output.get_tensor_impl().data[[row, col]] = result;
-                }
-                _ => break,
-            }
-            i += 1;
-        }
-    }
-
-    pub fn for_each_ternary(&self, op: impl Fn(&f64, &f64, &f64) -> f64) {
-        // For each assumes that there is only single output right now
-        // and the accepted closure accepts only two inputs
-
-        let output = &self.oprands_.first().unwrap().tensor;
-        let first_in = &self.oprands_.get(1).unwrap().tensor;
-        let second_in = &self.oprands_.get(2).unwrap().tensor;
-        let third_in = &self.oprands_.get(3).unwrap().tensor;
-        let out_numel = output.numel();
-
-        assert!(
-            (out_numel == first_in.numel())
-                && (out_numel == second_in.numel())
-                && (out_numel == third_in.numel()),
-            format!(
-                "oprands should have same number of elements, but got {},{},{},{}",
-                out_numel,
-                first_in.numel(),
-                second_in.numel(),
-                third_in.numel()
-            )
-        );
-
-        // let mut out_iter = output.get_tensor_impl().data.iter_mut();
-        let mut first_iter = first_in.get_tensor_impl().data.iter();
-        let mut second_iter = second_in.get_tensor_impl().data.iter();
-        let mut third_iter = third_in.get_tensor_impl().data.iter();
-        let sizes = output.sizes();
-
-        // Todo: here it is assumed that each operand is only two dimentional
-        // extend it to handle any dimensions.
-        // let rows = sizes[0];
-        let columns: usize = sizes[1];
-        let mut row: usize;
-        let mut col: usize;
-        let mut idx = 0usize;
-        {
-            let data = &mut output.get_tensor_impl().data;
-            loop {
-                match (first_iter.next(), second_iter.next(), third_iter.next()) {
-                    (Some(g), Some(i), Some(t)) => {
-                        let result = op(g, i, t);
-                        row = idx / columns;
-                        col = idx % columns;
-                        data[[row, col]] = result;
-                    }
-                    _ => break,
-                }
-                idx += 1;
-            }
-        }
-    }
-
-    pub fn nullary_op(output: &Tensor) -> Self {
-        TensorIteratorConfig::default()
-            .check_all_same_dtype(false)
-            .add_output(output)
-            .resize_outputs(false)
-            .build()
-    }
-
-    pub fn output(&self) -> &Tensor {
-        &self.oprands_.first().unwrap().tensor
-    }
-}
-
-pub struct TensorIteratorConfig {
-    tensors_: smallvec::SmallVec<[Tensor; 4]>,
-    num_inputs_: usize,
-    num_outputs_: usize,
-    static_shape_: Option<DimVector>,
-    check_mem_overlap_: bool,
-    allow_cpu_scalars_: bool,
-    is_reduction_: bool,
-    resize_outputs_: bool,
-    check_all_same_dtype_: bool,
-    check_all_same_device_: bool,
-    enforce_safe_casting_to_output_: bool,
-    promote_inputs_to_common_dtype_: bool,
-    cast_common_dtypes_to_outputs_: bool,
-}
-
-impl Default for TensorIteratorConfig {
-    fn default() -> Self {
-        Self {
-            tensors_: smallvec::smallvec![],
-            num_inputs_: 0,
-            num_outputs_: 0,
-            static_shape_: None,
-            check_mem_overlap_: false,
-            allow_cpu_scalars_: false,
-            is_reduction_: false,
-            resize_outputs_: true,
-            check_all_same_dtype_: true,
-            check_all_same_device_: true,
-            enforce_safe_casting_to_output_: false,
-            promote_inputs_to_common_dtype_: false,
-            cast_common_dtypes_to_outputs_: false,
-        }
-    }
-}
-
-impl TensorIteratorConfig {
-    pub fn add_output(&mut self, output: &Tensor) -> &mut Self {
-        assert!(self.num_inputs_ == 0);
-        self.tensors_.push(output.clone());
-        self.num_outputs_ += 1;
-        self
-    }
-
-    pub fn add_input(&mut self, input: &Tensor) -> &mut Self {
-        self.tensors_.push(input.clone());
-        self.num_inputs_ += 1;
-        self
-    }
-
-    pub fn check_all_same_dtype(&mut self, check_all_same_dtype: bool) -> &mut Self {
-        self.check_all_same_dtype_ = check_all_same_dtype;
-        self
-    }
-
-    pub fn resize_outputs(&mut self, resize_outputs: bool) -> &mut Self {
-        self.resize_outputs_ = resize_outputs;
-        self
-    }
-    pub fn build(&self) -> TensorIterator {
-        TensorIterator::build(self)
-    }
-}
-
-// For now using Tensor type as OperandInfo, but when Tensor supports other types
+// For now using NewTensor type as OperandInfo, but when NewTensor supports other types
 // This needs to have a new struct similar to pytorch.
 
+#[derive(Debug)]
 struct NewOperandInfo {
     is_output: bool,
+    is_read_write: bool,
     tensor: NewTensor,
     stride_bytes: StrideVector,
     data: Option<NonNull<c_void>>,
+    device: Device,
+    target_dtype: ScalarType,
+    current_dtype: ScalarType,
 }
 
 impl NewOperandInfo {
     pub fn new(tensor: NewTensor) -> Self {
-        Self {
-            is_output: false,
-            tensor,
-            stride_bytes: StrideVector::new(),
-            data: None,
+        if tensor.defined() {
+            let target_dtype = tensor.scalar_type();
+            Self {
+                is_output: false,
+                is_read_write: false,
+                tensor,
+                stride_bytes: StrideVector::new(),
+                data: None,
+                target_dtype: target_dtype,
+                current_dtype: target_dtype,
+                device: Device::default(),
+            }
+        } else {
+            Self {
+                is_output: false,
+                is_read_write: false,
+                tensor,
+                stride_bytes: StrideVector::new(),
+                data: None,
+                target_dtype: ScalarType::Undefined,
+                current_dtype: ScalarType::Undefined,
+                device: Device::default(),
+            }
         }
+    }
+    pub fn is_type_defined(&self) -> bool {
+        self.target_dtype != ScalarType::Undefined
     }
 }
 #[derive(PartialEq)]
@@ -395,7 +135,7 @@ enum FastSetupType {
     CHANNELSLAST,
     NONOVERLAPPINGDENSE,
 }
-// TensorIterator currently doesn't support the feature of having a Tensor
+// TensorIterator currently doesn't support the feature of having a NewTensor
 // both as an input and output.
 #[derive(Default)]
 pub struct NewTensorIterator {
@@ -405,35 +145,200 @@ pub struct NewTensorIterator {
     all_ops_same_shape_: bool,
     is_reduction_: bool,
     has_coalesced_dimensions: bool,
+    common_dtype_: ScalarType,
 }
 
 impl NewTensorIterator {
     pub fn build(config: &NewTensorIteratorConfig) -> Self {
         let mut self_ = Self::default();
         self_.populate_operands(config);
+        self_.mark_outputs();
+        self_.compute_mem_overlaps(config);
+
         self_.compute_shape(config);
         self_.resize_outputs(config);
+        self_.compute_types(config);
         if !self_.fast_setup(config) {
             todo!("Fast Setup failed. Implement normal setup")
         }
         for op in &mut self_.operands_ {
             op.data = Some(op.tensor.data_ptr());
         }
+        // dbg!(&self_.operands_.len());
         self_
     }
+    fn compute_types(&mut self, config: &NewTensorIteratorConfig) {
+        let common_device = KCPU;
+        self.common_dtype_ = ScalarType::Undefined;
+        let mut output_dtype = ScalarType::Undefined;
+        let mut has_different_input_dtypes = false;
+        let mut has_different_output_dtypes = false;
+        let mut has_undefined_outputs = false;
+        for op in self.operands_.iter_mut() {
+            if !op.is_type_defined() {
+                assert!(op.is_output, "Found type undefined input tensor!");
+                if let Some(dtype_and_device) = config.static_dtype_and_device_.as_ref() {
+                    op.target_dtype = dtype_and_device.0;
+                    op.device = dtype_and_device.1.clone();
+                } else {
+                    assert!(config.check_all_same_device_);
+                    has_undefined_outputs = true;
+                    continue;
+                }
+            }
+            if !op.tensor.defined() {
+                assert!(op.is_output, "Found undefined input tensor!");
+                continue;
+            }
+            assert_eq!(op.target_dtype, op.current_dtype);
+            if !op.is_output && op.target_dtype != self.common_dtype_ {
+                if self.common_dtype_ == ScalarType::Undefined {
+                    self.common_dtype_ = op.target_dtype;
+                } else {
+                    has_different_input_dtypes = true;
+                }
+            } else if op.is_output && op.target_dtype != self.common_dtype_ {
+                if output_dtype == ScalarType::Undefined {
+                    output_dtype = op.target_dtype;
+                } else {
+                    has_different_output_dtypes = true;
+                }
+            }
+        }
+        assert!(
+            !(has_different_input_dtypes
+                && !config.promote_inputs_to_common_dtype_
+                && (has_undefined_outputs
+                    || config.enforce_safe_casting_to_output_
+                    || config.cast_common_dtype_to_outputs_)),
+        );
+        if config.check_all_same_dtype_
+            && (has_different_input_dtypes
+                || has_different_output_dtypes
+                || (self.common_dtype_ != output_dtype && output_dtype != ScalarType::Undefined))
+        {
+            // Throws an informative error message
+            for op in self.operands_.iter() {
+                if !op.tensor.defined() {
+                    continue;
+                }
 
+                assert!(
+                    op.target_dtype == self.common_dtype_,
+                    format!(
+                        "Found dtype {:?} but expected {:?}",
+                        op.target_dtype, self.common_dtype_
+                    )
+                );
+            }
+        }
+        if !has_undefined_outputs
+            && !config.check_all_same_device_
+            && !config.promote_inputs_to_common_dtype_
+            && !config.cast_common_dtype_to_outputs_
+            && !config.enforce_safe_casting_to_output_
+        {
+            // Invalidates common_dtype_ if it could not be inferred
+            self.common_dtype_ = if has_different_input_dtypes {
+                ScalarType::Undefined
+            } else {
+                self.common_dtype_
+            };
+            return;
+        }
+        if has_different_input_dtypes && config.promote_inputs_to_common_dtype_ {
+            self.common_dtype_ = self.compute_common_dtype();
+        }
+        // let mut max_cpu_scalars_on_cuda = if config.allow_cpu_scalars_ { 1 } else { 0 };
+        // let mut current_cpu_scalars_on_cuda = 0;
+        for op in self.operands_.iter_mut() {
+            if !op.is_type_defined() {
+                op.target_dtype = self.common_dtype_;
+                op.device = common_device.into();
+                continue;
+            }
+
+            // Skips undefined tensors
+            if !op.tensor.defined() {
+                continue;
+            }
+
+            // Checks safe casting, if requested
+            if config.enforce_safe_casting_to_output_
+                && op.is_output
+                && op.current_dtype != self.common_dtype_
+            {
+                assert!(
+                    can_cast(self.common_dtype_, op.current_dtype),
+                    format!(
+                        "result type {:?} can't be cast to the desired output type {:?}",
+                        self.common_dtype_, op.current_dtype
+                    )
+                );
+            }
+        }
+    }
+    fn compute_common_dtype(&mut self) -> ScalarType {
+        let mut state = aten::native::ResultTypeState::default();
+        for op in self.operands_.iter() {
+            if op.is_output {
+                continue;
+            }
+            state = aten::native::update_result_type_state(&op.tensor, state);
+        }
+        self.common_dtype_ = aten::native::result_type(&state);
+        assert!(self.common_dtype_ != ScalarType::Undefined);
+        self.common_dtype_
+    }
     fn populate_operands(&mut self, config: &NewTensorIteratorConfig) {
         // Pytorch has both populate_operands and mark_tensor methods for filling
         // tensors in iterator, but here I am using only this method for both tasks.
-        self.num_outputs_ = config.num_outputs_;
-        for i in 0..config.tensors_.len() {
-            self.operands_
-                .push(NewOperandInfo::new(config.tensors_[i].clone()));
-        }
 
-        // mark_outputs method is implemented here.
+        for tensor in config.tensors_.iter() {
+            self.operands_.push(NewOperandInfo::new(tensor.clone()))
+        }
+        self.num_outputs_ = config.num_outputs_;
+    }
+
+    fn mark_outputs(&mut self) {
+        // Here I used three loops because, rust doesn't let us use mutable and immutable
+        // references at the same time.
         for i in 0..self.num_outputs_ {
             self.operands_[i].is_output = true;
+        }
+
+        let ntensors = self.ntensors();
+        let mut indices = vec![];
+        for i in 0..self.num_outputs_ {
+            let output = &(&self.operands_[i].tensor);
+            if !output.defined() {
+                continue;
+            }
+            for arg in self.num_outputs_..ntensors {
+                let input = &self.operands_[arg].tensor;
+                if output.is_same(input) {
+                    indices.push(i);
+                }
+            }
+        }
+        for i in indices {
+            self.operands_[i].is_read_write = true;
+        }
+    }
+    fn compute_mem_overlaps(&mut self, config: &NewTensorIteratorConfig) {
+        if !config.check_mem_overlap_ {
+            return;
+        }
+        for i in 0..self.num_outputs_ {
+            let output = &self.operands_[i].tensor;
+            if !output.defined() {
+                continue;
+            }
+            aten::assert_no_internal_overlap(output);
+            for j in self.num_outputs_..self.ntensors() {
+                let input = &self.operands_[j].tensor;
+                aten::assert_no_partial_overlap(output, input);
+            }
         }
     }
 
@@ -477,9 +382,9 @@ impl NewTensorIterator {
 
         for i in 0..self.num_outputs_ {
             let tensor = &self.operands_[i].tensor;
-            if tensor.sizes() != self.shape_.as_slice() {
+            if tensor.defined() && tensor.sizes() != self.shape_.as_slice() {
                 if config.resize_outputs_ {
-                    let _ = tensor.resize(self.shape_.as_slice(), None);
+                    tensor.resize(self.shape_.as_slice(), None);
                     continue;
                 }
 
@@ -503,9 +408,12 @@ impl NewTensorIterator {
         match setup_type {
             FastSetupType::CONTIGUOUS => {
                 for i in 0..self.num_outputs_ {
-                    let op = &self.operands_[i];
+                    let op = &mut self.operands_[i];
                     if !op.tensor.defined() {
-                        panic!("Should create an empty tensor if not defined")
+                        assert!(op.is_type_defined(), "No type for operand {}", i);
+                        op.tensor
+                            .move_tensor(autograd::empty(self.shape_.as_slice(), None, None));
+                        op.current_dtype = op.target_dtype;
                     }
                 }
             }
@@ -532,7 +440,7 @@ impl NewTensorIterator {
     fn ndim(&self) -> usize {
         self.shape_.len()
     }
-    fn numel(&self) -> usize {
+    pub fn numel(&self) -> usize {
         self.shape_.iter().product()
     }
 
@@ -545,7 +453,7 @@ impl NewTensorIterator {
         // let mut is_non_overlapping_and_dense = true;
         for op in &self.operands_ {
             if op.tensor.defined() {
-                is_contiguous &= op.tensor.is_contiguous(MemoryFormat::Contiguous);
+                is_contiguous &= op.tensor.is_contiguous();
                 // is_contiguous &= op.tensor.is_contiguous(MemoryFormat::Contiguous);
                 // is_contiguous &= op.tensor.is_contiguous(MemoryFormat::Contiguous);
             }
@@ -564,13 +472,35 @@ impl NewTensorIterator {
             .resize_outputs(false)
             .build()
     }
-
+    pub fn binary_op(
+        out: &NewTensor,
+        a: &NewTensor,
+        b: &NewTensor,
+        check_mem_overlap: bool,
+    ) -> Self {
+        NewTensorIteratorConfig::default()
+            .set_check_mem_overlap(check_mem_overlap)
+            .add_output(out)
+            .add_input(a)
+            .add_input(b)
+            .allow_cpu_scalars(true)
+            .promote_inputs_to_common_dtype(true)
+            .cast_common_dtype_to_outputs(true)
+            .enforce_safe_casting_to_output(true)
+            .build()
+    }
     pub fn output(&self) -> &NewTensor {
         &self.operands_.first().unwrap().tensor
     }
 
     pub fn ntensors(&self) -> usize {
         self.operands_.len()
+    }
+    pub fn dtype(&self) -> ScalarType {
+        self.dtype_(0)
+    }
+    pub fn dtype_(&self, i: usize) -> ScalarType {
+        self.operands_[i].current_dtype
     }
     fn get_strides(&self) -> StrideVector {
         let mut strides = StrideVector::new();
@@ -600,7 +530,7 @@ impl NewTensorIterator {
             for arg in 0..self.ntensors() {
                 ptrs.insert(arg, unsafe {
                     NonNull::new_unchecked(
-                        base[dim]
+                        base[arg]
                             .as_ptr()
                             .add(value * self.operands_[arg].stride_bytes[dim]),
                     )
@@ -643,11 +573,35 @@ impl NewTensorIterator {
         if numel == 0 {
             return;
         } else if numel < 32768 {
-            let t: Vec<usize> = (0..numel).collect();
-            return self.serial_for_each(loop_, t.as_slice());
+            let range: Vec<usize> = (0..numel).collect();
+            return self.serial_for_each_2d(loop_, range.as_slice());
         }
     }
-    fn serial_for_each<F>(&self, mut loop_: F, range: &[usize])
+
+    pub fn serial_for_each<F>(&self, mut loop_: F, range: &[usize])
+    where
+        F: FnMut(&[NonNull<u8>], &[usize], usize),
+    {
+        let ntensors = self.ntensors();
+
+        let loop_2d = move |base: &[NonNull<u8>], strides: &[usize], size0: usize, size1: usize| {
+            let mut data: smallvec::SmallVec<[NonNull<u8>; 4]> = base.into();
+            let (strides, outer_strides) = strides.split_at(ntensors);
+            for i in 0..size1 {
+                if i > 0 {
+                    for arg in 0..ntensors {
+                        data[arg] = unsafe {
+                            NonNull::new_unchecked(data[arg].as_ptr().add(outer_strides[arg]))
+                        };
+                    }
+                }
+                loop_(data.as_slice(), strides, size0);
+            }
+        };
+        self.serial_for_each_2d(loop_2d, range);
+    }
+
+    fn serial_for_each_2d<F>(&self, mut loop_: F, range: &[usize])
     where
         F: FnMut(&[NonNull<u8>], &[usize], usize, usize),
     {
@@ -685,6 +639,7 @@ pub struct NewTensorIteratorConfig {
     num_inputs_: usize,
     num_outputs_: usize,
     static_shape_: Option<DimVector>,
+    static_dtype_and_device_: Option<(ScalarType, Device)>,
     check_mem_overlap_: bool,
     allow_cpu_scalars_: bool,
     is_reduction_: bool,
@@ -693,7 +648,7 @@ pub struct NewTensorIteratorConfig {
     check_all_same_device_: bool,
     enforce_safe_casting_to_output_: bool,
     promote_inputs_to_common_dtype_: bool,
-    cast_common_dtypes_to_outputs_: bool,
+    cast_common_dtype_to_outputs_: bool,
 }
 
 impl Default for NewTensorIteratorConfig {
@@ -711,7 +666,8 @@ impl Default for NewTensorIteratorConfig {
             check_all_same_device_: true,
             enforce_safe_casting_to_output_: false,
             promote_inputs_to_common_dtype_: false,
-            cast_common_dtypes_to_outputs_: false,
+            cast_common_dtype_to_outputs_: false,
+            static_dtype_and_device_: None,
         }
     }
 }
@@ -729,12 +685,43 @@ impl NewTensorIteratorConfig {
         self.num_inputs_ += 1;
         self
     }
-
+    pub fn set_check_mem_overlap(&mut self, check_mem_overlap: bool) -> &mut Self {
+        self.check_mem_overlap_ = check_mem_overlap;
+        self
+    }
     pub fn check_all_same_dtype(&mut self, check_all_same_dtype: bool) -> &mut Self {
         self.check_all_same_dtype_ = check_all_same_dtype;
         self
     }
+    pub fn promote_inputs_to_common_dtype(
+        &mut self,
+        promote_inputs_to_common_dtype: bool,
+    ) -> &mut Self {
+        self.promote_inputs_to_common_dtype_ = promote_inputs_to_common_dtype;
+        self
+    }
 
+    pub fn allow_cpu_scalars(&mut self, allow_cpu_scalars: bool) -> &mut Self {
+        self.allow_cpu_scalars_ = allow_cpu_scalars;
+        self
+    }
+    pub fn cast_common_dtype_to_outputs(
+        &mut self,
+        cast_common_dtype_to_outputs: bool,
+    ) -> &mut Self {
+        self.cast_common_dtype_to_outputs_ = cast_common_dtype_to_outputs;
+        if cast_common_dtype_to_outputs {
+            self.check_all_same_dtype_ = false;
+        }
+        self
+    }
+    pub fn enforce_safe_casting_to_output(
+        &mut self,
+        enforce_safe_casting_to_output: bool,
+    ) -> &mut Self {
+        self.enforce_safe_casting_to_output_ = enforce_safe_casting_to_output;
+        self
+    }
     pub fn resize_outputs(&mut self, resize_outputs: bool) -> &mut Self {
         self.resize_outputs_ = resize_outputs;
         self

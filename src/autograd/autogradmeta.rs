@@ -6,13 +6,13 @@ use std::rc::{Rc, Weak};
 pub struct AutogradMeta {
     pub grad_fn_: Option<Rc<RefCell<Node>>>,
     pub grad_accumulator_: Option<Weak<RefCell<Node>>>,
-    pub grad_: Option<Rc<RefCell<Tensor>>>,
+    pub grad_: Option<NewTensor>,
     pub requires_grad: bool,
     pub output_nr: usize,
 }
 
 impl AutogradMeta {
-    pub fn new(_impl_: &TensorImpl, requires_grad: bool, edge: Edge) -> AutogradMeta {
+    pub fn new(_impl_: &NewTensorImpl, requires_grad: bool, edge: Edge) -> AutogradMeta {
         let grad_fn = edge.function;
         let output_nr = edge.input_nr;
         // Todo: pytorch has extra function to set requires_grad.
@@ -25,15 +25,15 @@ impl AutogradMeta {
             output_nr,
         }
     }
-    pub fn new_without_edge(impl_: &TensorImpl, requires_grad: bool) -> AutogradMeta {
+    pub fn new_without_edge(impl_: &NewTensorImpl, requires_grad: bool) -> AutogradMeta {
         let edge = Edge::empty();
         Self::new(impl_, requires_grad, edge)
     }
-    pub fn grad(&self) -> Option<Rc<RefCell<Tensor>>> {
+    pub fn grad(&self) -> Option<NewTensor> {
         self.grad_.clone()
     }
-    pub fn set_grad(&mut self, grad: Tensor) {
-        self.grad_ = Some(Rc::new(RefCell::new(grad)))
+    pub fn set_grad(&mut self, grad: NewTensor) {
+        self.grad_ = Some(grad)
     }
 
     pub fn requires_grad(&self) -> bool {

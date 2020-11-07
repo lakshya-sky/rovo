@@ -58,8 +58,12 @@ pub trait Allocator {
 }
 
 pub struct AllocatorRegisterer;
-static mut ALLOCATORARRAY: [Option<*mut dyn Allocator>; 11] = [None; 11];
-static mut ALLOCATORPRIORITY: [usize; 11] = [0; 11];
+
+static mut ALLOCATORARRAY: [Option<*mut dyn Allocator>;
+    DeviceType::COMPILE_TIME_MAX_DEVICE_TYPE as usize] =
+    [None; DeviceType::COMPILE_TIME_MAX_DEVICE_TYPE as usize];
+static mut ALLOCATORPRIORITY: [usize; DeviceType::COMPILE_TIME_MAX_DEVICE_TYPE as usize] =
+    [0; DeviceType::COMPILE_TIME_MAX_DEVICE_TYPE as usize];
 
 pub fn reigster_allocator(alloc: *mut dyn Allocator, t: DeviceType) {
     set_allocator(t, alloc, 0);

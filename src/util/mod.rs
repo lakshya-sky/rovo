@@ -1,20 +1,6 @@
 mod ordered_dict;
-use crate::tensor::Tensor;
+use crate::tensor::NewTensor;
 pub use ordered_dict::*;
-
-pub fn shallow_compare(lhs: Tensor, rhs: Tensor) -> bool {
-    if lhs.dim() != rhs.dim() {
-        false
-    } else {
-        let lhs_slice = lhs.get_tensor_impl().data.as_slice();
-        let rhs_slice = rhs.get_tensor_impl().data.as_slice();
-        if lhs_slice == rhs_slice {
-            true
-        } else {
-            false
-        }
-    }
-}
 
 pub fn is_expandable_to(shape: &[usize], desired: &[usize]) -> bool {
     let shape_dim = shape.len();
@@ -37,7 +23,7 @@ pub fn is_expandable_to(shape: &[usize], desired: &[usize]) -> bool {
     return true;
 }
 
-pub fn sum_to(mut tensor: Tensor, shape: &[usize]) -> Tensor {
+pub fn sum_to(mut tensor: NewTensor, shape: &[usize]) -> NewTensor {
     if shape.len() == 0 {
         return tensor.sum();
     }
