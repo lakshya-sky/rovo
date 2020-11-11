@@ -22,6 +22,12 @@ pub use memory_format::*;
 mod scalar_type;
 pub use scalar_type::*;
 
+mod scalar;
+pub use scalar::*;
+
+mod tensor_options;
+pub use tensor_options::*;
+
 pub fn allocator_init() {
     cpu_allocator::register_cpu_allocator();
 }

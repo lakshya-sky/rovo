@@ -53,6 +53,7 @@ fn init_rovo() {
 mod test {
     use super::autograd::*;
     use super::tensor::*;
+    use super::c10::*;
     #[test]
     fn test_backward_add() {
         crate::init_rovo();

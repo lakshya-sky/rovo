@@ -26,6 +26,19 @@ impl Default for ScalarType {
         ScalarType::Undefined
     }
 }
+
+impl From<ScalarType> for TypeMeta {
+    fn from(s: ScalarType) -> Self {
+        match s {
+            ScalarType::Int => TypeMeta::make::<i32>(),
+            ScalarType::Float => TypeMeta::make::<f32>(),
+            ScalarType::Double => TypeMeta::make::<f64>(),
+            ScalarType::Long => TypeMeta::make::<i64>(),
+            _ => todo!(),
+        }
+    }
+}
+
 #[inline(always)]
 pub fn type_meta_to_scalar_type(dtype: &TypeMeta) -> ScalarType {
     if let Some(scalar_type) = try_type_meta_to_scalar_type(dtype) {
@@ -108,4 +121,16 @@ pub fn can_cast(from: ScalarType, to: ScalarType) -> bool {
         return false;
     }
     return true;
+}
+
+#[macro_export]
+macro_rules! AT_FORALL_SCALAR_TYPES_AND2 {
+    // ($SCALARTYPE1: path, $SCALARTYPE2: path, $name: literal)=>{
+
+    // }
+    ($name: tt) => {
+        $name!(u8, Byte);
+        $name!(i32, Int);
+        $name!(f32, Float);
+    };
 }

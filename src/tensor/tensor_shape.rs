@@ -34,7 +34,7 @@ pub fn as_strided_tensorimpl(
     storage_offset: Option<usize>,
 ) -> NewTensor {
     let storage_offset = storage_offset.unwrap_or_else(|| self_.storage_offset());
-    let result = crate::aten::native::tensor_factories::make_tensor(self_.storage(), self_.dtype());
+    let result = crate::aten::native::make_tensor(self_.storage(), self_.dtype());
     set_strided(&result, size, stride, storage_offset);
     result
 }

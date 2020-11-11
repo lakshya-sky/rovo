@@ -1,7 +1,7 @@
-use crate::aten::native::tensor_factories;
+use crate::aten::native;
 use crate::autograd::AutogradMeta;
-use crate::c10::MemoryFormat;
-use crate::tensor::{Edge, NewTensor, TensorOptions, TensorVersion};
+use crate::c10::{MemoryFormat, TensorOptions};
+use crate::tensor::{Edge, NewTensor, TensorVersion};
 use std::rc::Rc;
 
 pub fn make_variable(data: NewTensor, requires_grad: bool) -> NewTensor {
@@ -60,9 +60,8 @@ pub fn empty<A: Into<Option<TensorOptions>>, M: Into<Option<MemoryFormat>>>(
     memory_format: M,
 ) -> NewTensor {
     let options = get_options(options);
-    let tensor = (|| -> NewTensor {
-        tensor_factories::empty(size, options.set_requires_grad(None), memory_format)
-    })();
+    let tensor =
+        (|| -> NewTensor { native::empty(size, options.set_requires_grad(None), memory_format) })();
     let result = make_variable(tensor, options.requires_grad());
     result
 }
@@ -74,7 +73,7 @@ pub fn empty_like<A: Into<Option<TensorOptions>>, M: Into<Option<MemoryFormat>>>
 ) -> NewTensor {
     let options = get_options(options);
     let tensor = (|| -> NewTensor {
-        tensor_factories::empty_like(self_, options.set_requires_grad(None), memory_format)
+        native::empty_like(self_, options.set_requires_grad(None), memory_format)
     })();
     let result = make_variable(tensor, options.requires_grad());
     result
@@ -82,17 +81,15 @@ pub fn empty_like<A: Into<Option<TensorOptions>>, M: Into<Option<MemoryFormat>>>
 
 pub fn ones<A: Into<Option<TensorOptions>>>(size: &[usize], options: A) -> NewTensor {
     let options = get_options(options);
-    let tensor =
-        (|| -> NewTensor { tensor_factories::ones(size, options.set_requires_grad(None)) })();
+    let tensor = (|| -> NewTensor { native::ones(size, options.set_requires_grad(None)) })();
     let result = make_variable(tensor, options.requires_grad());
     result
 }
 
 pub fn ones_like<A: Into<Option<TensorOptions>>>(self_: &NewTensor, options: A) -> NewTensor {
     let options = get_options(options);
-    let tensor = (|| -> NewTensor {
-        tensor_factories::ones_like(self_, options.set_requires_grad(None), None)
-    })();
+    let tensor =
+        (|| -> NewTensor { native::ones_like(self_, options.set_requires_grad(None), None) })();
     let result = make_variable(tensor, options.requires_grad());
     result
 }
@@ -103,9 +100,8 @@ pub fn full<A: Into<Option<TensorOptions>>>(
     options: A,
 ) -> NewTensor {
     let options = get_options(options);
-    let tensor = (|| -> NewTensor {
-        tensor_factories::full(size, fill_value, options.set_requires_grad(None))
-    })();
+    let tensor =
+        (|| -> NewTensor { native::full(size, fill_value, options.set_requires_grad(None)) })();
     let result = make_variable(tensor, options.requires_grad());
     result
 }
@@ -117,7 +113,7 @@ pub fn full_like<A: Into<Option<TensorOptions>>>(
 ) -> NewTensor {
     let options = get_options(options);
     let tensor = (|| -> NewTensor {
-        tensor_factories::full_like(self_, fill_value, options.set_requires_grad(None), None)
+        native::full_like(self_, fill_value, options.set_requires_grad(None), None)
     })();
     let result = make_variable(tensor, options.requires_grad());
     result

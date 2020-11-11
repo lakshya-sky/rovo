@@ -1,5 +1,5 @@
 use crate::c10::{
-    get_default_dtype, Device, DeviceType, Layout, MemoryFormat, TypeMeta, K_STRIDED,
+    get_default_dtype, Device, DeviceType, Layout, MemoryFormat, ScalarType, TypeMeta, K_STRIDED,
 };
 #[derive(Clone)]
 pub struct TensorOptions {
@@ -68,6 +68,13 @@ impl TensorOptions {
 
     pub fn set_dtype<T: Into<Option<TypeMeta>>>(&self, dtype: T) -> Self {
         let mut clone = self.clone();
+        clone.set_dtype_mut(dtype);
+        clone
+    }
+
+    pub fn set_dtype_<T: Into<Option<ScalarType>>>(&self, scalar_type: T) -> Self {
+        let mut clone = self.clone();
+        let dtype: Option<TypeMeta> = scalar_type.into().map_or(None, |s| Some(s.into()));
         clone.set_dtype_mut(dtype);
         clone
     }
@@ -170,6 +177,15 @@ impl TensorOptions {
             None
         }
     }
+
+    pub fn device(&self) -> Device {
+        if self.has_device {
+            self.device.clone()
+        } else {
+            Device::new(DeviceType::CPU, None)
+        }
+    }
+
     pub fn layout_opt(&self) -> Option<Layout> {
         if self.has_layout {
             Some(self.layout)
@@ -218,4 +234,8 @@ impl AsRef<Self> for TensorOptions {
     fn as_ref(&self) -> &Self {
         self
     }
+}
+
+pub fn device(device: impl Into<Device>) -> TensorOptions {
+    TensorOptions::with_device(device.into())
 }

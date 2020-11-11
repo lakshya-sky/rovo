@@ -1,7 +1,7 @@
 use crate::aten::util::prod_intlist;
-use crate::c10::{MemoryFormat, Storage, StorageImpl, TypeMeta};
+use crate::c10::{MemoryFormat, Scalar, Storage, StorageImpl, TensorOptions, TypeMeta, KCPU};
 use crate::core::get_cpu_allocator;
-use crate::tensor::{NewTensor, NewTensorImpl, TensorOptions};
+use crate::tensor::{NewTensor, NewTensorImpl};
 
 pub fn empty_cpu<T: Into<Option<MemoryFormat>>, A: AsRef<TensorOptions>>(
     size: &[usize],
@@ -103,6 +103,19 @@ pub fn make_tensor<T: Into<Storage>>(storage: T, dtype: &TypeMeta) -> NewTensor 
     let device = storage.device();
     let impl_ = NewTensorImpl::new(storage, dtype.clone(), Some(device));
     NewTensor::from_impl(impl_)
+}
+
+/* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Scalar Tensor ~~~~~~~~~~~~~~~~~~~~~~~~~~ */
+pub fn scalar_tensor<A: AsRef<TensorOptions>>(s: Scalar, options: A) -> NewTensor {
+    let options = options.as_ref();
+    if options.device() == KCPU {
+        let result = empty_cpu(&[], options, None);
+        result.fill_(s);
+        return result;
+    }
+    let result = empty(&[], options, None);
+    result.fill_(s);
+    result
 }
 
 #[cfg(test)]

@@ -7,7 +7,8 @@ pub use tensor_compare::*;
 pub mod cpu;
 pub mod distribution_templates;
 
-pub mod tensor_factories;
+mod tensor_factories;
+pub use tensor_factories::*;
 
 mod fill;
 pub use fill::*;

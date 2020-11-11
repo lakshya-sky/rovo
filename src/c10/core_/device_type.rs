@@ -1,4 +1,4 @@
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum DeviceType {
     CPU,
     CUDA,
@@ -7,7 +7,7 @@ pub enum DeviceType {
 pub const KCPU: DeviceType = DeviceType::CPU;
 pub const KCUDA: DeviceType = DeviceType::CUDA;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Device {
     type_: DeviceType,
     index: i16,
@@ -31,8 +31,21 @@ impl Device {
     }
 }
 
+impl From<&DeviceType> for Device {
+    fn from(device_type: &DeviceType) -> Self {
+        Device::new(*device_type, None)
+    }
+}
+
 impl From<DeviceType> for Device {
     fn from(device_type: DeviceType) -> Self {
         Device::new(device_type, None)
+    }
+}
+
+impl PartialEq<DeviceType> for Device {
+    fn eq(&self, other: &DeviceType) -> bool {
+        let other: Device = other.into();
+        self == &other
     }
 }

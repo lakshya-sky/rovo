@@ -99,22 +99,22 @@ pub fn execute_op<I: Copy, O: num::cast::NumCast, F, const N: usize>(
         i += 1;
     }
 }
-fn dereference<'a, T: Copy, const N: usize>(
+fn dereference<'a, I: Copy, const N: usize>(
     data: &'a [NonNull<u8>],
     strides: &[usize],
     i: usize,
-) -> [T; N] {
+) -> [I; N] {
     let base = &data[0..N];
     let stride = &strides[0..N];
     let mut inputs = Vec::with_capacity(N);
     for (b, s) in base.iter().zip(stride.iter()) {
         unsafe {
-            let ptr_ = b.as_ptr().add(i * s) as *const T;
+            let ptr_ = b.as_ptr().add(i * s) as *const I;
             inputs.push(*ptr_);
         }
     }
     let boxed_slice = inputs.into_boxed_slice();
-    let boxed_array: Box<[T; N]> = match boxed_slice.try_into() {
+    let boxed_array: Box<[I; N]> = match boxed_slice.try_into() {
         Ok(ba) => ba,
         Err(o) => panic!("Expected a Vec of length {} but it was {}", N, o.len()),
     };

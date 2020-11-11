@@ -1,5 +1,6 @@
 use crate::aten::native::*;
 use crate::autograd::SavedTensor;
+use crate::c10::Scalar;
 use crate::ops::*;
 use crate::tensor::*;
 use crate::util_autograd;
@@ -38,9 +39,13 @@ impl Add<Self> for &NewTensor {
     }
 }
 
-impl Add<f64> for &NewTensor {
+impl<S> Add<S> for &NewTensor
+where
+    S: Into<Scalar>,
+{
     type Output = NewTensor;
-    fn add(self, _rhs: f64) -> Self::Output {
+    fn add(self, rhs: S) -> Self::Output {
+        let rhs = rhs.into();
         let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
         if util_autograd::compute_requires_grad(&[&self]) {
             let mut _grad_fn = AddBackwardScalar {
@@ -51,24 +56,21 @@ impl Add<f64> for &NewTensor {
             grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
         }
 
-        // let result = &self._impl.borrow().data + rhs;
-        // let _impl = NewTensorImpl {
-        //     data: result,
-        //     autogradmeta: None,
-        //     version_counter: TensorVersion::new(),
-        // };
-        // let result = NewTensor::from_impl(_impl);
-        // if grad_fn.is_some() {
-        //     util_autograd::set_history(&result, grad_fn.unwrap());
-        // }
-        // result
-        todo!();
+        let result = add_scalar(self, rhs, 1.0);
+
+        if grad_fn.is_some() {
+            util_autograd::set_history(&result, grad_fn.unwrap());
+        }
+        result
     }
 }
 
-impl Add<f64> for NewTensor {
+impl<S> Add<S> for NewTensor
+where
+    S: Into<Scalar>,
+{
     type Output = NewTensor;
-    fn add(self, rhs: f64) -> Self::Output {
+    fn add(self, rhs: S) -> Self::Output {
         let result = &self + rhs;
         result
     }
@@ -99,9 +101,13 @@ impl Mul<Self> for &NewTensor {
     }
 }
 
-impl Mul<f64> for &NewTensor {
+impl<S> Mul<S> for &NewTensor
+where
+    S: Into<Scalar>,
+{
     type Output = NewTensor;
-    fn mul(self, rhs: f64) -> Self::Output {
+    fn mul(self, rhs: S) -> Self::Output {
+        let rhs: Scalar = rhs.into();
         let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
         if util_autograd::compute_requires_grad(&[&self]) {
             let mut _grad_fn = MulBackwardScalar {
@@ -114,24 +120,21 @@ impl Mul<f64> for &NewTensor {
             _grad_fn._self = Some(SavedTensor::new(self, false));
             grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
         }
-        // let result = &self._impl.borrow().data * rhs;
-        // let _impl = NewTensorImpl {
-        //     data: result,
-        //     autogradmeta: None,
-        //     version_counter: TensorVersion::new(),
-        // };
-        // let result = NewTensor::from_impl(_impl);
-        // if grad_fn.is_some() {
-        //     util_autograd::set_history(&result, grad_fn.unwrap());
-        // }
-        // result
-        todo!();
+        let result = mul_scalar(self, rhs);
+
+        if grad_fn.is_some() {
+            util_autograd::set_history(&result, grad_fn.unwrap());
+        }
+        result
     }
 }
 
-impl Mul<f64> for NewTensor {
+impl<S> Mul<S> for NewTensor
+where
+    S: Into<Scalar>,
+{
     type Output = NewTensor;
-    fn mul(self, rhs: f64) -> Self::Output {
+    fn mul(self, rhs: S) -> Self::Output {
         let result = &self * rhs;
         result
     }
@@ -140,32 +143,7 @@ impl Mul<f64> for NewTensor {
 impl Mul<&Self> for NewTensor {
     type Output = NewTensor;
     fn mul(self, rhs: &Self) -> Self::Output {
-        // let result = &self._impl.borrow().data * &rhs._impl.borrow().data;
-        let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
-        if util_autograd::compute_requires_grad(&[&self, &rhs]) {
-            let mut _grad_fn = MulBackwardTensors {
-                next_edges: None,
-                input_metadata_: smallvec::smallvec![],
-                _self: None,
-                other: None,
-            };
-            _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[&self, &rhs]));
-            _grad_fn._self = Some(SavedTensor::new_consume(self, false));
-            _grad_fn.other = Some(SavedTensor::new(rhs, false));
-            grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
-        }
-
-        // let _impl = NewTensorImpl {
-        //     data: result,
-        //     autogradmeta: None,
-        //     version_counter: TensorVersion::new(),
-        // };
-        // let result = NewTensor::from_impl(_impl);
-        // if grad_fn.is_some() {
-        //     util_autograd::set_history(&result, grad_fn.unwrap());
-        // }
-        // result
-        todo!();
+        &self * rhs
     }
 }
 

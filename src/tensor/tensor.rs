@@ -1,7 +1,8 @@
 use super::tensor_ops;
 use crate::aten::native;
 use crate::c10::{
-    type_meta_to_scalar_type, Device, Layout, MemoryFormat, ScalarType, Storage, TypeMeta,
+    type_meta_to_scalar_type, Device, Layout, MemoryFormat, Scalar, ScalarType, Storage,
+    TensorOptions, TypeMeta,
 };
 use crate::core::Generator;
 use crate::ops::*;
@@ -70,9 +71,8 @@ impl NewTensor {
         if let Ok(impl_) = impl_ {
             let tensor_impl = impl_.into_inner();
             self._impl.replace(tensor_impl);
-            // self._impl = Rc::new(RefCell::new(tensor_impl));
-        }
-        else{
+        // self._impl = Rc::new(RefCell::new(tensor_impl));
+        } else {
             todo!();
         }
         // self._impl = other._impl
@@ -86,7 +86,7 @@ impl NewTensor {
         self.get_unsafe_tensor_impl().storage()
     }
 
-    pub fn fill_(&self, value: f32) -> &Self {
+    pub fn fill_(&self, value: impl Into<Scalar>) -> &Self {
         crate::aten::native::fill_(self, value)
     }
     pub fn sizes(&self) -> &[usize] {

@@ -1,4 +1,5 @@
 use crate::autograd::*;
+use crate::c10::Scalar;
 use crate::ops::NodeTrait;
 use crate::tensor::*;
 use smallvec::*;
@@ -246,16 +247,14 @@ pub struct MulBackwardScalar {
     pub input_metadata_: SmallVec<[InputMetaData; 1]>,
     pub next_edges: Option<EdgeList>,
     pub _self: Option<SavedTensor>,
-    pub other: f64,
+    pub other: Scalar,
 }
 
 impl NodeTrait for MulBackwardScalar {
     fn call(&mut self, grads: Vec<NewTensor>) -> Vec<NewTensor> {
         let grad = grads.first().unwrap();
         let other = self.other;
-
         let first = grad * other;
-
         vec![first]
     }
 

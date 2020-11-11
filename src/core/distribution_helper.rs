@@ -37,7 +37,7 @@ where
         + Copy
         + std::ops::Sub<Output = T>
         + num::cast::NumCast
-        + num_traits::Float,
+        + num::Float,
 {
     pub fn new(mean: T, std: T) -> Self {
         Self { mean, std }
