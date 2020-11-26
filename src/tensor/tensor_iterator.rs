@@ -1,14 +1,14 @@
-use super::NewTensor;
+use super::Tensor;
 use crate::aten;
 use crate::autograd;
-use crate::c10::{can_cast, Device, ScalarType, KCPU};
+use crate::c10::{can_cast, elementSize, Device, DeviceType, ScalarType, TensorOptions, KCPU};
 
 use std::{ffi::c_void, ptr::NonNull};
 type DimVector = smallvec::SmallVec<[usize; 5]>;
 type StrideVector = smallvec::SmallVec<[usize; 6]>;
 type LOOP = fn(&[NonNull<u8>], &[usize], usize);
 type LOOP2D = fn(&[NonNull<u8>], &[usize], usize, usize);
-// For now using NewTensor type as OperandInfo, but when NewTensor supports other types
+// For now using Tensor type as OperandInfo, but when Tensor supports other types
 // This needs to have a new struct similar to pytorch.
 
 struct DimCounter<'a, 'b> {
@@ -23,7 +23,7 @@ impl<'a, 'b> DimCounter<'a, 'b> {
         let mut self_ = Self {
             shape,
             range,
-            values: smallvec::smallvec![shape.len(); 0],
+            values: smallvec::smallvec![0; shape.len()],
             offset: range[0],
         };
         let mut linear_offset = self_.range[0];
@@ -82,14 +82,14 @@ impl<'a, 'b> DimCounter<'a, 'b> {
     }
 }
 
-// For now using NewTensor type as OperandInfo, but when NewTensor supports other types
+// For now using Tensor type as OperandInfo, but when Tensor supports other types
 // This needs to have a new struct similar to pytorch.
 
 #[derive(Debug)]
 struct NewOperandInfo {
     is_output: bool,
     is_read_write: bool,
-    tensor: NewTensor,
+    tensor: Tensor,
     stride_bytes: StrideVector,
     data: Option<NonNull<c_void>>,
     device: Device,
@@ -98,7 +98,7 @@ struct NewOperandInfo {
 }
 
 impl NewOperandInfo {
-    pub fn new(tensor: NewTensor) -> Self {
+    pub fn new(tensor: Tensor) -> Self {
         if tensor.defined() {
             let target_dtype = tensor.scalar_type();
             Self {
@@ -127,6 +127,11 @@ impl NewOperandInfo {
     pub fn is_type_defined(&self) -> bool {
         self.target_dtype != ScalarType::Undefined
     }
+    pub fn options(&self) -> TensorOptions {
+        let mut op = TensorOptions::default().set_dtype_(self.target_dtype);
+        op.set_device_mut(self.device.clone());
+        op
+    }
 }
 #[derive(PartialEq)]
 enum FastSetupType {
@@ -135,10 +140,10 @@ enum FastSetupType {
     CHANNELSLAST,
     NONOVERLAPPINGDENSE,
 }
-// TensorIterator currently doesn't support the feature of having a NewTensor
+// TensorIterator currently doesn't support the feature of having a Tensor
 // both as an input and output.
 #[derive(Default)]
-pub struct NewTensorIterator {
+pub struct TensorIterator {
     shape_: DimVector,
     operands_: smallvec::SmallVec<[NewOperandInfo; 4]>,
     num_outputs_: usize,
@@ -146,10 +151,77 @@ pub struct NewTensorIterator {
     is_reduction_: bool,
     has_coalesced_dimensions: bool,
     common_dtype_: ScalarType,
+    perm: DimVector,
 }
 
-impl NewTensorIterator {
-    pub fn build(config: &NewTensorIteratorConfig) -> Self {
+impl TensorIterator {
+    fn reorder_dimensions(&mut self, _config: &TensorIteratorConfig) {
+        let ndim = self.ndim();
+        self.perm.resize(ndim, 0);
+        if ndim == 1 {
+            self.perm[0] = 0;
+            return;
+        }
+        // initialize perm with n-1, n-2, ..., 1, 0
+        // let n = self.perm.len();
+        let mut val = 0;
+        for i in self.perm.iter_mut().rev() {
+            *i = val;
+            val += 1;
+        }
+        // returns 1 if the dim0 should come after dim1, -1 if dim0 should come
+        // before dim1, and 0 if the comparison is ambiguous.
+        let ntensors = self.ntensors();
+        let stride_bytes: Vec<_> = self
+            .operands_
+            .iter()
+            .map(|i| i.stride_bytes.clone())
+            .collect();
+        let is_reduction = self.is_reduction_;
+        let is_output: Vec<_> = self.operands_.iter().map(|i| i.is_output).collect();
+        let should_swap = |dim0: usize, dim1: usize| {
+            let ret = 0;
+            for arg in 0..ntensors {
+                if stride_bytes[arg].is_empty() {
+                    continue;
+                }
+                let stride0 = stride_bytes[arg][dim0];
+                let stride1 = stride_bytes[arg][dim1];
+                if is_reduction && is_output[arg] {
+                    // move reduced dimensions to the front
+                    if (stride0 == 0) != (stride1 == 0) {
+                        return if stride1 == 0 { 1 } else { -1 };
+                    }
+                }
+                if stride0 == 0 || stride1 == 0 {
+                    continue;
+                } else if stride0 <= stride1 {
+                    return -1;
+                } else {
+                    return 1;
+                }
+            }
+            return ret;
+        };
+
+        // insertion sort with support for ambiguous comparisons
+        for i in 1..self.ndim() {
+            let mut dim1 = i;
+            for dim0 in (0..i - 1).rev() {
+                let comparison = should_swap(self.perm[dim0], self.perm[dim1]);
+                if comparison > 0 {
+                    self.perm.swap(dim0, dim1);
+                    dim1 = dim0;
+                } else if comparison < 0 {
+                    break;
+                }
+            }
+        }
+        // perform re-ordering of shape and strides
+        self.permute_dimensions();
+    }
+
+    pub fn build(config: &TensorIteratorConfig) -> Self {
         let mut self_ = Self::default();
         self_.populate_operands(config);
         self_.mark_outputs();
@@ -159,7 +231,10 @@ impl NewTensorIterator {
         self_.resize_outputs(config);
         self_.compute_types(config);
         if !self_.fast_setup(config) {
-            todo!("Fast Setup failed. Implement normal setup")
+            self_.compute_strides(config);
+            self_.reorder_dimensions(config);
+            self_.allocate_outputs();
+            self_.coalesce_dimensions();
         }
         for op in &mut self_.operands_ {
             op.data = Some(op.tensor.data_ptr());
@@ -167,7 +242,7 @@ impl NewTensorIterator {
         // dbg!(&self_.operands_.len());
         self_
     }
-    fn compute_types(&mut self, config: &NewTensorIteratorConfig) {
+    fn compute_types(&mut self, config: &TensorIteratorConfig) {
         let common_device = KCPU;
         self.common_dtype_ = ScalarType::Undefined;
         let mut output_dtype = ScalarType::Undefined;
@@ -278,6 +353,144 @@ impl NewTensorIterator {
             }
         }
     }
+    fn compatible_stride(&self, element_size: usize) -> StrideVector {
+        let mut stride = StrideVector::new();
+        let mut next_stride = element_size;
+        for dim in 0..self.ndim() {
+            stride.push(next_stride);
+            next_stride *= self.shape_[dim];
+        }
+        return stride;
+    }
+    fn invert_perm(&self, input: &[usize]) -> DimVector {
+        // Invert the permutation caused by reorder_dimensions. This is not valid
+        // after coalesce_dimensions is called.
+        assert!(!self.has_coalesced_dimensions);
+        assert!(input.len() == self.perm.len());
+        let mut res = smallvec::smallvec![0; input.len()]; //no initialization needed, every value in res should be written to.
+        for dim in 0..self.ndim() {
+            res[self.perm[dim]] = input[dim];
+        }
+        return res;
+    }
+
+    fn allocate_outputs(&mut self) {
+        let ndim = self.ndim();
+        let mut stride_bytes = vec![];
+        let mut tensor_shape = vec![];
+        let mut inverted_vec = vec![true; self.num_outputs_];
+        for i in 0..self.num_outputs_ {
+            {
+                let op = &self.operands_[i];
+                if !op.tensor.defined() {
+                    assert!(op.is_type_defined(), "No type for operand {}", i);
+                    let el_size = elementSize(op.target_dtype);
+                    //Handle for last_* conditions;
+                    stride_bytes.push(self.compatible_stride(el_size));
+                }
+            }
+            {
+                let op = &mut self.operands_[i];
+                if !op.tensor.defined() {
+                    op.stride_bytes = stride_bytes[i].clone();
+                }
+            }
+
+            {
+                let op = &self.operands_[i];
+                if !op.tensor.defined() {
+                    let mut inverted = true;
+                    for dim in 1..=ndim {
+                        if self.perm[dim - 1] != (ndim - dim) {
+                            inverted = false;
+                            break;
+                        }
+                    }
+                    inverted_vec[i] = inverted;
+                    tensor_shape.push(self.invert_perm(&self.shape_.as_slice()));
+                }
+            }
+            {
+                let op = &mut self.operands_[i];
+                if !op.tensor.defined() {
+                    if inverted_vec[i] {
+                        op.tensor.move_tensor(aten::native::empty(
+                            tensor_shape[i].as_slice(),
+                            op.options(),
+                            None,
+                        ));
+                    } else {
+                        // let tensor_stride = self.invert_perm(&op.stride_bytes.as_slice());
+                        // for dim in 0..ndim {
+                        //     tensor_stride[dim] /= el_size;
+                        // }
+                        // op.tensor =
+                        //     aten::native::empty_strided(tensor_shape, tensor_stride, op.options());
+                        todo!()
+                    }
+                    op.current_dtype = op.target_dtype;
+                }
+            }
+        }
+    }
+
+    fn coalesce_dimensions(&mut self) {
+        let ndim = self.ndim();
+        if ndim <= 1 {
+            return;
+        }
+        let shape_ = self.shape_.clone();
+        let ntensors = self.ntensors();
+        let stride_bytes: Vec<_> = self
+            .operands_
+            .iter()
+            .map(|i| i.stride_bytes.clone())
+            .collect();
+        let can_coalesce = |dim0: usize, dim1: usize| {
+            let shape0 = shape_[dim0];
+            let shape1 = shape_[dim1];
+            if shape0 == 1 || shape1 == 1 {
+                return true;
+            }
+            for i in 0..ntensors {
+                let stride = &stride_bytes[i];
+                if shape0 * stride[dim0] != stride[dim1] {
+                    return false;
+                }
+            }
+            return true;
+        };
+        // replace each operands stride at dim0 with its stride at dim1
+        let replace_stride = |itr: &mut Self, dim0: usize, dim1: usize| {
+            for i in 0..ntensors {
+                let stride = &mut itr.operands_[i].stride_bytes;
+                stride[dim0] = stride[dim1];
+            }
+        };
+
+        let mut prev_dim = 0;
+        for dim in 1..ndim {
+            if can_coalesce(prev_dim, dim) {
+                if self.shape_[prev_dim] == 1 {
+                    replace_stride(self, prev_dim, dim);
+                }
+                self.shape_[prev_dim] *= self.shape_[dim];
+            } else {
+                prev_dim += 1;
+                if prev_dim != dim {
+                    replace_stride(self, prev_dim, dim);
+                    self.shape_[prev_dim] = self.shape_[dim];
+                }
+            }
+        }
+
+        self.shape_.resize(prev_dim + 1, 0);
+        for i in 0..self.ntensors() {
+            self.operands_[i].stride_bytes.resize(ndim, 0);
+        }
+        self.has_coalesced_dimensions = true;
+    }
+
     fn compute_common_dtype(&mut self) -> ScalarType {
         let mut state = aten::native::ResultTypeState::default();
         for op in self.operands_.iter() {
@@ -290,7 +503,7 @@ impl NewTensorIterator {
         assert!(self.common_dtype_ != ScalarType::Undefined);
         self.common_dtype_
     }
-    fn populate_operands(&mut self, config: &NewTensorIteratorConfig) {
+    fn populate_operands(&mut self, config: &TensorIteratorConfig) {
         // Pytorch has both populate_operands and mark_tensor methods for filling
         // tensors in iterator, but here I am using only this method for both tasks.
 
@@ -325,7 +538,7 @@ impl NewTensorIterator {
             self.operands_[i].is_read_write = true;
         }
     }
-    fn compute_mem_overlaps(&mut self, config: &NewTensorIteratorConfig) {
+    fn compute_mem_overlaps(&mut self, config: &TensorIteratorConfig) {
         if !config.check_mem_overlap_ {
             return;
         }
@@ -342,7 +555,7 @@ impl NewTensorIterator {
         }
     }
 
-    fn compute_shape(&mut self, config: &NewTensorIteratorConfig) {
+    fn compute_shape(&mut self, config: &TensorIteratorConfig) {
         if let Some(static_shape_) = config.static_shape_.as_ref() {
             self.shape_ = static_shape_.clone();
         } else {
@@ -375,7 +588,7 @@ impl NewTensorIterator {
         }
     }
 
-    pub fn resize_outputs(&self, config: &NewTensorIteratorConfig) {
+    pub fn resize_outputs(&self, config: &TensorIteratorConfig) {
         if config.static_shape_.is_some() {
             return;
         }
@@ -400,7 +613,34 @@ impl NewTensorIterator {
         }
     }
 
-    fn fast_setup(&mut self, config: &NewTensorIteratorConfig) -> bool {
+    fn compute_strides(&mut self, config: &TensorIteratorConfig) {
+        let ndim = self.ndim();
+        for op in self.operands_.iter_mut() {
+            if op.tensor.defined() {
+                let origional_shape = if config.static_shape_.is_some() {
+                    self.shape_.as_slice()
+                } else {
+                    op.tensor.sizes()
+                };
+                let original_stride = op.tensor.strides();
+                let element_size_in_bytes = op.tensor.element_size();
+                let offset = ndim - origional_shape.len();
+                if offset > 0 {
+                    op.stride_bytes.resize(ndim, 0);
+                } else {
+                    op.stride_bytes.resize(ndim, 0);
+                }
+                for i in 0..origional_shape.len() {
+                    if origional_shape[i] == 1 {
+                        op.stride_bytes[offset + i] = 0;
+                    } else {
+                        op.stride_bytes[offset + i] = original_stride[i] * element_size_in_bytes;
+                    }
+                }
+            }
+        }
+    }
+    fn fast_setup(&mut self, config: &TensorIteratorConfig) -> bool {
         let setup_type = self.compute_fast_setup_type(config);
         if setup_type == FastSetupType::NONE {
             return false;
@@ -444,7 +684,7 @@ impl NewTensorIterator {
         self.shape_.iter().product()
     }
 
-    fn compute_fast_setup_type(&self, _config: &NewTensorIteratorConfig) -> FastSetupType {
+    fn compute_fast_setup_type(&self, _config: &TensorIteratorConfig) -> FastSetupType {
         if self.is_reduction_ || !self.all_ops_same_shape_ {
             return FastSetupType::NONE;
         }
@@ -461,24 +701,30 @@ impl NewTensorIterator {
         if is_contiguous {
             return FastSetupType::CONTIGUOUS;
         }
-
-        todo!()
+        FastSetupType::NONE
     }
 
-    pub fn nullary_op(output: &NewTensor) -> Self {
-        NewTensorIteratorConfig::default()
+    pub fn nullary_op(output: &Tensor) -> Self {
+        TensorIteratorConfig::default()
             .check_all_same_dtype(false)
             .add_output(output)
             .resize_outputs(false)
             .build()
     }
-    pub fn binary_op(
-        out: &NewTensor,
-        a: &NewTensor,
-        b: &NewTensor,
-        check_mem_overlap: bool,
-    ) -> Self {
-        NewTensorIteratorConfig::default()
+
+    pub fn unary_op(out: &Tensor, a: &Tensor, check_mem_overlap: bool) -> Self {
+        TensorIteratorConfig::default()
+            .set_check_mem_overlap(check_mem_overlap)
+            .add_output(out)
+            .add_input(a)
+            .cast_common_dtype_to_outputs(false)
+            .enforce_safe_casting_to_output(false)
+            .check_all_same_dtype(true)
+            .build()
+    }
+
+    pub fn binary_op(out: &Tensor, a: &Tensor, b: &Tensor, check_mem_overlap: bool) -> Self {
+        TensorIteratorConfig::default()
             .set_check_mem_overlap(check_mem_overlap)
             .add_output(out)
             .add_input(a)
@@ -489,7 +735,7 @@ impl NewTensorIterator {
             .enforce_safe_casting_to_output(true)
             .build()
     }
-    pub fn output(&self) -> &NewTensor {
+    pub fn output(&self) -> &Tensor {
         &self.operands_.first().unwrap().tensor
     }
 
@@ -501,6 +747,13 @@ impl NewTensorIterator {
     }
     pub fn dtype_(&self, i: usize) -> ScalarType {
         self.operands_[i].current_dtype
+    }
+    pub fn device(&self, arg: usize) -> &Device {
+        &self.operands_[arg].device
+    }
+
+    pub fn device_type(&self, arg: usize) -> DeviceType {
+        self.device(arg).type_()
     }
     fn get_strides(&self) -> StrideVector {
         let mut strides = StrideVector::new();
@@ -539,6 +792,27 @@ impl NewTensorIterator {
         }
         ptrs
     }
+    fn permute_dimensions(&mut self) {
+        let perm = self.perm.as_slice();
+        assert!(perm.len() == self.ndim());
+
+        let reorder = |data: &[usize]| {
+            let mut res: DimVector = (0..data.len()).map(|_| 0).collect();
+            for i in 0..perm.len() {
+                res[i] = data[perm[i]];
+            }
+            return res;
+        };
+
+        // Update shape and strides
+        self.shape_ = reorder(self.shape_.as_slice());
+        for op in self.operands_.iter_mut() {
+            if op.stride_bytes.len() > 0 {
+                op.stride_bytes = reorder(op.stride_bytes.as_slice()).as_slice().into();
+            }
+        }
+    }
+
     fn data_ptr(&self, arg: usize) -> NonNull<c_void> {
         self.operands_[arg].data.unwrap().clone()
     }
@@ -634,8 +908,8 @@ impl NewTensorIterator {
     }
 }
 
-pub struct NewTensorIteratorConfig {
-    tensors_: smallvec::SmallVec<[NewTensor; 4]>,
+pub struct TensorIteratorConfig {
+    tensors_: smallvec::SmallVec<[Tensor; 4]>,
     num_inputs_: usize,
     num_outputs_: usize,
     static_shape_: Option<DimVector>,
@@ -651,7 +925,7 @@ pub struct NewTensorIteratorConfig {
     cast_common_dtype_to_outputs_: bool,
 }
 
-impl Default for NewTensorIteratorConfig {
+impl Default for TensorIteratorConfig {
     fn default() -> Self {
         Self {
             tensors_: smallvec::smallvec![],
@@ -672,15 +946,15 @@ impl Default for NewTensorIteratorConfig {
     }
 }
 
-impl NewTensorIteratorConfig {
-    pub fn add_output(&mut self, output: &NewTensor) -> &mut Self {
+impl TensorIteratorConfig {
+    pub fn add_output(&mut self, output: &Tensor) -> &mut Self {
         assert!(self.num_inputs_ == 0);
         self.tensors_.push(output.clone());
         self.num_outputs_ += 1;
         self
     }
 
-    pub fn add_input(&mut self, input: &NewTensor) -> &mut Self {
+    pub fn add_input(&mut self, input: &Tensor) -> &mut Self {
         self.tensors_.push(input.clone());
         self.num_inputs_ += 1;
         self
@@ -726,7 +1000,7 @@ impl NewTensorIteratorConfig {
         self.resize_outputs_ = resize_outputs;
         self
     }
-    pub fn build(&self) -> NewTensorIterator {
-        NewTensorIterator::build(self)
+    pub fn build(&self) -> TensorIterator {
+        TensorIterator::build(self)
     }
 }

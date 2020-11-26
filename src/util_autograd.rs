@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::rc::Weak;
 
-pub fn compute_requires_grad(tensors: &[&NewTensor]) -> bool {
+pub fn compute_requires_grad(tensors: &[&Tensor]) -> bool {
     let mut out = false;
     if !GradMode::is_enabled() {
         out
@@ -22,7 +22,7 @@ pub fn compute_requires_grad(tensors: &[&NewTensor]) -> bool {
 
 pub struct TensorHook;
 impl TensorHook {
-    pub fn grad_fn(tensor: &NewTensor) -> Option<&Rc<RefCell<Node>>> {
+    pub fn grad_fn(tensor: &Tensor) -> Option<&Rc<RefCell<Node>>> {
         if let Some(meta) = Self::get_autograd_meta(tensor) {
             meta.grad_fn_.as_ref()
         } else {
@@ -30,13 +30,13 @@ impl TensorHook {
         }
     }
 
-    pub fn get_autograd_meta(tensor: &NewTensor) -> Option<&mut AutogradMeta> {
+    pub fn get_autograd_meta(tensor: &Tensor) -> Option<&mut AutogradMeta> {
         let w = unsafe { &mut *tensor._impl.clone().as_ptr() };
         w.get_autogradmeta()
     }
 
     // Todo: Use get_autograd_meta here instead of set_gradient_edge()
-    pub fn materialize_autograd_meta(tensor: &NewTensor) -> &mut AutogradMeta {
+    pub fn materialize_autograd_meta(tensor: &Tensor) -> &mut AutogradMeta {
         let mut p = tensor._impl.borrow_mut();
         if p.autogradmeta.as_ref().is_none() {
             p.set_autograd_meta(Some(AutogradMetaFactory::make()))
@@ -44,35 +44,35 @@ impl TensorHook {
         TensorHook::get_autograd_meta(tensor).unwrap()
     }
 
-    pub fn tensor_data(tensor: &NewTensor) -> NewTensor {
+    pub fn tensor_data(tensor: &Tensor) -> Tensor {
         let tensor_impl_copy = tensor
             .get_unsafe_tensor_impl()
             .shallow_copy_and_detach(tensor.get_unsafe_tensor_impl().version_counter());
-        NewTensor::from_impl(tensor_impl_copy)
+        Tensor::from_impl(tensor_impl_copy)
     }
 
-    pub fn version_counter(tensor: &NewTensor) -> &TensorVersion {
+    pub fn version_counter(tensor: &Tensor) -> &TensorVersion {
         tensor.get_unsafe_tensor_impl().version_counter()
     }
 
-    pub fn set_grad_accumulator(tensor: &NewTensor, grad_accumulator: Option<Weak<RefCell<Node>>>) {
+    pub fn set_grad_accumulator(tensor: &Tensor, grad_accumulator: Option<Weak<RefCell<Node>>>) {
         let t = Self::materialize_autograd_meta(tensor);
         t.grad_accumulator_ = grad_accumulator;
     }
 
-    pub fn set_version_counter(tensor: &NewTensor, version_counter: TensorVersion) {
+    pub fn set_version_counter(tensor: &Tensor, version_counter: TensorVersion) {
         let impl_ = tensor.get_unsafe_tensor_impl();
         impl_.set_version_counter(version_counter);
     }
 }
 
-pub fn grad_accumulator(tensor: &NewTensor) -> Option<Rc<RefCell<Node>>> {
+pub fn grad_accumulator(tensor: &Tensor) -> Option<Rc<RefCell<Node>>> {
     if let Some(meta) = TensorHook::get_autograd_meta(tensor) {
         if let Some(acc_) = meta.grad_accumulator_.as_ref() {
             Weak::upgrade(acc_)
         } else {
             let result = Rc::new(RefCell::new(Node::new(AccumulateGrad::new(
-                NewTensor::new(tensor),
+                Tensor::new(tensor),
             ))));
             meta.grad_accumulator_ = Some(Rc::downgrade(&result));
             Some(result)
@@ -81,7 +81,7 @@ pub fn grad_accumulator(tensor: &NewTensor) -> Option<Rc<RefCell<Node>>> {
         None
     }
 }
-pub fn gradient_edge(tensor: &NewTensor) -> Edge {
+pub fn gradient_edge(tensor: &Tensor) -> Edge {
     if let Some(grad_fn) = tensor.grad_fn() {
         Edge::new(Some(grad_fn.clone()), tensor.output_nr())
     } else {
@@ -89,7 +89,7 @@ pub fn gradient_edge(tensor: &NewTensor) -> Edge {
     }
 }
 
-pub fn collect_next_edges(tensors: &[&NewTensor]) -> Vec<Edge> {
+pub fn collect_next_edges(tensors: &[&Tensor]) -> Vec<Edge> {
     let mut next_edges: Vec<Edge> = vec![];
     next_edges.reserve(tensors.len());
     for t in tensors {
@@ -98,7 +98,7 @@ pub fn collect_next_edges(tensors: &[&NewTensor]) -> Vec<Edge> {
     next_edges
 }
 
-pub fn set_gradient_edge(tensor: &NewTensor, args: (Rc<RefCell<Node>>, usize)) {
+pub fn set_gradient_edge(tensor: &Tensor, args: (Rc<RefCell<Node>>, usize)) {
     let edge = Edge::new(Some(args.0), args.1);
     // Todo: read todo on materialize_autograd_meta
     TensorHook::materialize_autograd_meta(tensor);
@@ -108,7 +108,7 @@ pub fn set_gradient_edge(tensor: &NewTensor, args: (Rc<RefCell<Node>>, usize)) {
     meta.set_output_nr(edge.input_nr);
 }
 
-pub fn set_history(tensor: &NewTensor, grad_fn: Rc<RefCell<Node>>) {
+pub fn set_history(tensor: &Tensor, grad_fn: Rc<RefCell<Node>>) {
     let output_nr = grad_fn.borrow_mut().add_input_metadata(tensor);
     set_gradient_edge(tensor, (grad_fn, output_nr))
 }

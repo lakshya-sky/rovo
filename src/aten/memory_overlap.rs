@@ -1,5 +1,5 @@
 use crate::c10::K_STRIDED;
-use crate::tensor::{NewTensor, NewTensorImpl};
+use crate::tensor::{Tensor, TensorImpl};
 
 #[derive(PartialEq)]
 pub enum MemOverlap {
@@ -16,11 +16,11 @@ pub enum MemOverlapStatus {
     TOOHARD,
 }
 
-pub fn has_internal_overlap(tensor: &NewTensor) -> MemOverlap {
+pub fn has_internal_overlap(tensor: &Tensor) -> MemOverlap {
     has_internal_overlap_(tensor.get_unsafe_tensor_impl())
 }
 
-pub fn has_internal_overlap_(t: &NewTensorImpl) -> MemOverlap {
+pub fn has_internal_overlap_(t: &TensorImpl) -> MemOverlap {
     assert!(t.layout() == K_STRIDED);
 
     if t.is_contiguous() {
@@ -38,11 +38,11 @@ pub fn has_internal_overlap_(t: &NewTensorImpl) -> MemOverlap {
     return MemOverlap::TOOHARD;
 }
 
-pub fn assert_no_internal_overlap(tensor: &NewTensor) {
+pub fn assert_no_internal_overlap(tensor: &Tensor) {
     assert_no_internal_overlap_(tensor.get_unsafe_tensor_impl());
 }
 
-pub fn assert_no_internal_overlap_(t: &NewTensorImpl) {
+pub fn assert_no_internal_overlap_(t: &TensorImpl) {
     assert!(
         has_internal_overlap_(t) != MemOverlap::YES,
         "unsupported operation: more than one element of the written-to tensor 
@@ -51,12 +51,12 @@ pub fn assert_no_internal_overlap_(t: &NewTensorImpl) {
     );
 }
 
-pub fn get_overlap_status(a: &NewTensor, b: &NewTensor) -> MemOverlapStatus {
+pub fn get_overlap_status(a: &Tensor, b: &Tensor) -> MemOverlapStatus {
     return get_overlap_status_(a.get_unsafe_tensor_impl(), b.get_unsafe_tensor_impl());
 }
 
-pub fn get_overlap_status_(a: &NewTensorImpl, b: &NewTensorImpl) -> MemOverlapStatus {
-    if a as *const NewTensorImpl == b as *const NewTensorImpl {
+pub fn get_overlap_status_(a: &TensorImpl, b: &TensorImpl) -> MemOverlapStatus {
+    if a as *const TensorImpl == b as *const TensorImpl {
         return MemOverlapStatus::FULL;
     }
     if a.numel() == 0 || b.numel() == 0 {
@@ -84,10 +84,10 @@ pub fn get_overlap_status_(a: &NewTensorImpl, b: &NewTensorImpl) -> MemOverlapSt
     return MemOverlapStatus::NO;
 }
 
-pub fn assert_no_partial_overlap(a: &NewTensor, b: &NewTensor) {
+pub fn assert_no_partial_overlap(a: &Tensor, b: &Tensor) {
     assert_no_partial_overlap_(a.get_unsafe_tensor_impl(), b.get_unsafe_tensor_impl())
 }
-pub fn assert_no_partial_overlap_(a: &NewTensorImpl, b: &NewTensorImpl) {
+pub fn assert_no_partial_overlap_(a: &TensorImpl, b: &TensorImpl) {
     assert!(
         get_overlap_status_(a, b) != MemOverlapStatus::PARTIAL,
         "unsupported operation: some elements of the input tensor and

@@ -218,22 +218,22 @@ mod test {
     const MAGIC_NUMBER: u64 = 424242424242424242;
 
     fn normal<'a>(
-        tensor: &'a NewTensor,
+        tensor: &'a Tensor,
         mean: f64,
         std: f64,
         gen: Option<&mut Generator>,
-    ) -> &'a NewTensor {
+    ) -> &'a Tensor {
         let normal_kernel = NormalKernel;
         normal_impl_(normal_kernel, tensor, mean, std, gen)
     }
 
     fn normal_impl_<'a>(
         kernel: NormalKernel,
-        self_: &'a NewTensor,
+        self_: &'a Tensor,
         mean: f64,
         std: f64,
         gen: Option<&mut Generator>,
-    ) -> &'a NewTensor {
+    ) -> &'a Tensor {
         kernel.call(self_, mean, std, gen);
         self_
     }

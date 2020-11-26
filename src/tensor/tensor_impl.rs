@@ -48,24 +48,24 @@ impl TensorVersion {
     }
 }
 
-// pub struct NewTensorImpl {
+// pub struct TensorImpl {
 //     pub data: NdArray<f64>,
 //     pub autogradmeta: Option<AutogradMeta>,
 //     pub version_counter: TensorVersion,
 // }
 
-// impl NewTensorImpl {
-//     pub fn from_scalar(shape: &[usize], scalar: f64, requires_grad: bool) -> NewTensorImpl {
+// impl TensorImpl {
+//     pub fn from_scalar(shape: &[usize], scalar: f64, requires_grad: bool) -> TensorImpl {
 //         //Todo: this is weird because its what pytorch does.
-//         NewTensorImpl::new_from_array(NdArray::<f64>::from_elem(shape, scalar), requires_grad)
+//         TensorImpl::new_from_array(NdArray::<f64>::from_elem(shape, scalar), requires_grad)
 //     }
 
-//     pub fn ones(shape: &[usize]) -> NewTensorImpl {
-//         NewTensorImpl::new_from_array(NdArray::<f64>::ones(shape), false)
+//     pub fn ones(shape: &[usize]) -> TensorImpl {
+//         TensorImpl::new_from_array(NdArray::<f64>::ones(shape), false)
 //     }
 
-//     pub fn zeros(shape: &[usize]) -> NewTensorImpl {
-//         NewTensorImpl::new_from_array(NdArray::<f64>::zeros(shape), false)
+//     pub fn zeros(shape: &[usize]) -> TensorImpl {
+//         TensorImpl::new_from_array(NdArray::<f64>::zeros(shape), false)
 //     }
 
 //     pub fn new_from_array(data: NdArray<f64>, requires_grad: bool) -> Self {
@@ -89,11 +89,11 @@ impl TensorVersion {
 //         Self::new_from_array(unsafe { ndarray::Array::uninitialized(size) }, false)
 //     }
 
-//     pub fn grad(&self) -> Option<Rc<RefCell<NewTensor>>> {
+//     pub fn grad(&self) -> Option<Rc<RefCell<Tensor>>> {
 //         self.autogradmeta.as_ref().unwrap().grad()
 //     }
 
-//     pub fn set_grad(&mut self, grad: NewTensor) {
+//     pub fn set_grad(&mut self, grad: Tensor) {
 //         if self.autogradmeta.is_none() {
 //             self.autogradmeta = Some(AutogradMetaFactory::make());
 //         }
@@ -139,9 +139,9 @@ impl TensorVersion {
 //         meta.output_nr = output_nr;
 //     }
 
-//     pub fn shallow_copy(&self) -> NewTensorImpl {
+//     pub fn shallow_copy(&self) -> TensorImpl {
 //         let data = self.data.clone();
-//         NewTensorImpl {
+//         TensorImpl {
 //             data,
 //             autogradmeta: None,
 //             version_counter: TensorVersion::new(),
@@ -160,14 +160,14 @@ impl TensorVersion {
 //         self.version_counter = version_counter;
 //     }
 
-//     pub fn uniform(shape: &[usize], from: f64, to: f64) -> NewTensorImpl {
+//     pub fn uniform(shape: &[usize], from: f64, to: f64) -> TensorImpl {
 //         let uniform = NdArray::<f64>::random(shape, rand_distr::Uniform::new(from, to));
-//         NewTensorImpl::new_from_array(uniform, false)
+//         TensorImpl::new_from_array(uniform, false)
 //     }
 
-//     pub fn randn(shape: &[usize]) -> NewTensorImpl {
+//     pub fn randn(shape: &[usize]) -> TensorImpl {
 //         let uniform = NdArray::<f64>::random(shape, rand_distr::StandardNormal);
-//         NewTensorImpl::new_from_array(uniform, false)
+//         TensorImpl::new_from_array(uniform, false)
 //     }
 
 //     pub fn t(&self) -> Self {
@@ -195,7 +195,7 @@ impl TensorVersion {
 //     }
 // }
 
-pub struct NewTensorImpl {
+pub struct TensorImpl {
     storage: Storage,
     pub autogradmeta: Option<AutogradMeta>,
     pub version_counter: TensorVersion,
@@ -209,7 +209,7 @@ pub struct NewTensorImpl {
     is_wrapped_number: bool,
     is_defined: bool,
 }
-impl Default for NewTensorImpl {
+impl Default for TensorImpl {
     fn default() -> Self {
         Self {
             storage: Storage::default(),
@@ -228,7 +228,7 @@ impl Default for NewTensorImpl {
     }
 }
 
-impl NewTensorImpl {
+impl TensorImpl {
     pub fn new(storage: Storage, data_type: TypeMeta, device_opt: Option<Device>) -> Self {
         let sizes = smallvec::smallvec![0];
         let storage_offset = 0;
@@ -254,17 +254,17 @@ impl NewTensorImpl {
     pub fn defined(&self) -> bool {
         self.is_defined
     }
-    // pub fn from_scalar(shape: &[usize], scalar: f64, requires_grad: bool) -> NewTensorImpl {
+    // pub fn from_scalar(shape: &[usize], scalar: f64, requires_grad: bool) -> TensorImpl {
     //     //Todo: this is weird because its what pytorch does.
-    //     NewTensorImpl::new_from_array(NdArray::<f64>::from_elem(shape, scalar), requires_grad)
+    //     TensorImpl::new_from_array(NdArray::<f64>::from_elem(shape, scalar), requires_grad)
     // }
 
-    // pub fn ones(shape: &[usize]) -> NewTensorImpl {
-    //     NewTensorImpl::new_from_array(NdArray::<f64>::ones(shape), false)
+    // pub fn ones(shape: &[usize]) -> TensorImpl {
+    //     TensorImpl::new_from_array(NdArray::<f64>::ones(shape), false)
     // }
 
-    // pub fn zeros(shape: &[usize]) -> NewTensorImpl {
-    //     NewTensorImpl::new_from_array(NdArray::<f64>::zeros(shape), false)
+    // pub fn zeros(shape: &[usize]) -> TensorImpl {
+    //     TensorImpl::new_from_array(NdArray::<f64>::zeros(shape), false)
     // }
 
     // pub fn new_from_array(data: NdArray<f64>, requires_grad: bool) -> Self {
@@ -288,11 +288,11 @@ impl NewTensorImpl {
     //     Self::new_from_array(unsafe { ndarray::Array::uninitialized(size) }, false)
     // }
 
-    pub fn grad(&self) -> Option<NewTensor> {
+    pub fn grad(&self) -> Option<Tensor> {
         self.autogradmeta.as_ref().unwrap().grad()
     }
 
-    pub fn set_grad(&mut self, grad: NewTensor) {
+    pub fn set_grad(&mut self, grad: Tensor) {
         if self.autogradmeta.is_none() {
             self.autogradmeta = Some(AutogradMetaFactory::make());
         }
@@ -306,7 +306,6 @@ impl NewTensorImpl {
         } else {
             result = false
         }
-        // eprintln!("Requires Grad: {}", result);
         result
     }
 
@@ -374,7 +373,6 @@ impl NewTensorImpl {
         if new_dim > 0 {
             let mut dim = new_dim - 1;
             loop {
-                dbg!(new_stride);
                 self.strides[dim] = new_stride[dim];
                 if dim == 0 {
                     break;
@@ -441,6 +439,10 @@ impl NewTensorImpl {
     pub fn size(&self, d: usize) -> usize {
         let d = maybe_wrap_dim(d as i64, self.dim(), false);
         self.sizes[d]
+    }
+    pub fn stride(&self, d: usize) -> usize {
+        let d = maybe_wrap_dim(d as i64, self.dim(), false);
+        self.strides[d]
     }
     pub fn bump_version(&self) {
         self.version_counter.bump()
@@ -541,7 +543,7 @@ impl NewTensorImpl {
         format!("{:?}", vec.as_slice())
     }
 }
-impl std::fmt::Debug for NewTensorImpl {
+impl std::fmt::Debug for TensorImpl {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.print_impl())
     }

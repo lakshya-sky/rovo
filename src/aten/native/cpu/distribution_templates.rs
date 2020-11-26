@@ -1,10 +1,10 @@
 use crate::c10::ScalarType;
 use crate::core::*;
-use crate::tensor::{NewTensor, NewTensorIterator};
+use crate::tensor::{Tensor, TensorIterator};
 use crate::Closure;
 
 pub fn uniform_kernel(
-    mut iter: NewTensorIterator,
+    mut iter: TensorIterator,
     from: f64,
     to: f64,
     gen: &mut dyn GeneratorImpl,
@@ -17,12 +17,12 @@ pub fn uniform_kernel(
 pub struct NormalKernel;
 
 impl NormalKernel {
-    pub fn call(&self, self_: &NewTensor, mean: f64, std: f64, gen: Option<&mut Generator>) {
+    pub fn call(&self, self_: &Tensor, mean: f64, std: f64, gen: Option<&mut Generator>) {
         normal_kernel(self_, mean, std, check_generator(gen.unwrap()))
     }
 }
 
-pub fn normal_kernel(self_: &NewTensor, mean: f64, std: f64, gen: &mut dyn GeneratorImpl) {
+pub fn normal_kernel(self_: &Tensor, mean: f64, std: f64, gen: &mut dyn GeneratorImpl) {
     let size = self_.numel();
     if self_.scalar_type() == ScalarType::Float && size >= 16 {
         normal_fill(self_, mean as f32, std as f32, gen);
@@ -36,7 +36,7 @@ pub fn normal_kernel(self_: &NewTensor, mean: f64, std: f64, gen: &mut dyn Gener
                 if size >= 16 && self_.is_contiguous() {
                     normal_fill(self_, mean as SCALAR, std as SCALAR, gen);
                 } else {
-                    let mut iter = crate::tensor::NewTensorIterator::nullary_op(self_);
+                    let mut iter = crate::tensor::TensorIterator::nullary_op(self_);
 
                     let closure = Closure::new(|_args: [f64; 0]| {
                         let normal = NormalDistribution::new(mean, std);
@@ -92,6 +92,6 @@ pub fn normal_kernel(self_: &NewTensor, mean: f64, std: f64, gen: &mut dyn Gener
     }
 }
 
-fn normal_fill<T>(_self_: &NewTensor, _mean: T, _std: T, _gen: &mut dyn GeneratorImpl) {
+fn normal_fill<T>(_self_: &Tensor, _mean: T, _std: T, _gen: &mut dyn GeneratorImpl) {
     todo!()
 }

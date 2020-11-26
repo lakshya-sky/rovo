@@ -29,5 +29,6 @@ pub fn uniform_real<
     }
     let tmp = val & mask;
     let x: T = num::cast::<V, T>(tmp).unwrap() * divisor;
-    x * (to - from) + from
+    let result = x * (to - from) + from;
+    result
 }

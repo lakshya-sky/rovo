@@ -1,4 +1,5 @@
 use crate::c10::TypeMeta;
+use std::mem::size_of;
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ScalarType {
     Byte,
@@ -133,4 +134,16 @@ macro_rules! AT_FORALL_SCALAR_TYPES_AND2 {
         $name!(i32, Int);
         $name!(f32, Float);
     };
+}
+
+#[inline(always)]
+pub fn elementSize(t: ScalarType) -> usize {
+    match t {
+        ScalarType::Byte => size_of::<u8>(),
+        ScalarType::Char => size_of::<char>(),
+        ScalarType::Bool => size_of::<bool>(),
+        ScalarType::Int => size_of::<i32>(),
+        ScalarType::Float => size_of::<f32>(),
+        _ => todo!(),
+    }
 }

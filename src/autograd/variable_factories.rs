@@ -1,10 +1,10 @@
 use crate::aten::native;
 use crate::autograd::AutogradMeta;
 use crate::c10::{MemoryFormat, TensorOptions};
-use crate::tensor::{Edge, NewTensor, TensorVersion};
+use crate::tensor::{Edge, Tensor, TensorVersion};
 use std::rc::Rc;
 
-pub fn make_variable(data: NewTensor, requires_grad: bool) -> NewTensor {
+pub fn make_variable(data: Tensor, requires_grad: bool) -> Tensor {
     if data.defined() {
         if Rc::strong_count(&data._impl) == 1 && data.get_unsafe_tensor_impl().unique_version() {
             let mut data_impl = Rc::try_unwrap(data._impl).unwrap().into_inner();
@@ -16,7 +16,7 @@ pub fn make_variable(data: NewTensor, requires_grad: bool) -> NewTensor {
             } else {
                 data_impl.set_autograd_meta(None);
             }
-            return NewTensor::from_impl(data_impl);
+            return Tensor::from_impl(data_impl);
         } else {
             let mut other_impl_copy = data
                 .get_unsafe_tensor_impl()
@@ -29,13 +29,13 @@ pub fn make_variable(data: NewTensor, requires_grad: bool) -> NewTensor {
             } else {
                 other_impl_copy.set_autograd_meta(None);
             }
-            return NewTensor::from_impl(other_impl_copy);
+            return Tensor::from_impl(other_impl_copy);
         }
     }
-    NewTensor::default()
+    Tensor::default()
 }
 
-pub fn make_variable_with_edge(other: NewTensor, gradient_edge: Edge) -> NewTensor {
+pub fn make_variable_with_edge(other: Tensor, gradient_edge: Edge) -> Tensor {
     let mut other_impl_copy = other
         .get_unsafe_tensor_impl()
         .shallow_copy_and_detach(other.get_unsafe_tensor_impl().version_counter());
@@ -44,7 +44,7 @@ pub fn make_variable_with_edge(other: NewTensor, gradient_edge: Edge) -> NewTens
         false,
         gradient_edge,
     )));
-    NewTensor::from_impl(other_impl_copy)
+    Tensor::from_impl(other_impl_copy)
 }
 
 pub fn get_options<A: Into<Option<TensorOptions>>>(options: A) -> TensorOptions {
@@ -58,38 +58,38 @@ pub fn empty<A: Into<Option<TensorOptions>>, M: Into<Option<MemoryFormat>>>(
     size: &[usize],
     options: A,
     memory_format: M,
-) -> NewTensor {
+) -> Tensor {
     let options = get_options(options);
     let tensor =
-        (|| -> NewTensor { native::empty(size, options.set_requires_grad(None), memory_format) })();
+        (|| -> Tensor { native::empty(size, options.set_requires_grad(None), memory_format) })();
     let result = make_variable(tensor, options.requires_grad());
     result
 }
 
 pub fn empty_like<A: Into<Option<TensorOptions>>, M: Into<Option<MemoryFormat>>>(
-    self_: &NewTensor,
+    self_: &Tensor,
     options: A,
     memory_format: M,
-) -> NewTensor {
+) -> Tensor {
     let options = get_options(options);
-    let tensor = (|| -> NewTensor {
+    let tensor = (|| -> Tensor {
         native::empty_like(self_, options.set_requires_grad(None), memory_format)
     })();
     let result = make_variable(tensor, options.requires_grad());
     result
 }
 
-pub fn ones<A: Into<Option<TensorOptions>>>(size: &[usize], options: A) -> NewTensor {
+pub fn ones<A: Into<Option<TensorOptions>>>(size: &[usize], options: A) -> Tensor {
     let options = get_options(options);
-    let tensor = (|| -> NewTensor { native::ones(size, options.set_requires_grad(None)) })();
+    let tensor = (|| -> Tensor { native::ones(size, options.set_requires_grad(None)) })();
     let result = make_variable(tensor, options.requires_grad());
     result
 }
 
-pub fn ones_like<A: Into<Option<TensorOptions>>>(self_: &NewTensor, options: A) -> NewTensor {
+pub fn ones_like<A: Into<Option<TensorOptions>>>(self_: &Tensor, options: A) -> Tensor {
     let options = get_options(options);
     let tensor =
-        (|| -> NewTensor { native::ones_like(self_, options.set_requires_grad(None), None) })();
+        (|| -> Tensor { native::ones_like(self_, options.set_requires_grad(None), None) })();
     let result = make_variable(tensor, options.requires_grad());
     result
 }
@@ -98,21 +98,21 @@ pub fn full<A: Into<Option<TensorOptions>>>(
     size: &[usize],
     fill_value: f32,
     options: A,
-) -> NewTensor {
+) -> Tensor {
     let options = get_options(options);
     let tensor =
-        (|| -> NewTensor { native::full(size, fill_value, options.set_requires_grad(None)) })();
+        (|| -> Tensor { native::full(size, fill_value, options.set_requires_grad(None)) })();
     let result = make_variable(tensor, options.requires_grad());
     result
 }
 
 pub fn full_like<A: Into<Option<TensorOptions>>>(
-    self_: &NewTensor,
+    self_: &Tensor,
     fill_value: f32,
     options: A,
-) -> NewTensor {
+) -> Tensor {
     let options = get_options(options);
-    let tensor = (|| -> NewTensor {
+    let tensor = (|| -> Tensor {
         native::full_like(self_, fill_value, options.set_requires_grad(None), None)
     })();
     let result = make_variable(tensor, options.requires_grad());

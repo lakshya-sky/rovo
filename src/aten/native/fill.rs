@@ -1,8 +1,8 @@
 use crate::c10::Scalar;
-use crate::tensor::{NewTensor, NewTensorIterator};
+use crate::tensor::{Tensor, TensorIterator};
 
-pub fn fill_(self_: &NewTensor, value: impl Into<Scalar>) -> &NewTensor {
-    let iter = NewTensorIterator::nullary_op(self_);
-    super::cpu::fill_kernel::fill_kernel(iter, value.into());
+pub fn fill_(self_: &Tensor, value: impl Into<Scalar>) -> &Tensor {
+    let iter = TensorIterator::nullary_op(self_);
+    super::cpu::fill_kernel(iter, value.into());
     self_
 }

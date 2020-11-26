@@ -1,4 +1,4 @@
-use super::{NewTensor, NewTensorIteratorConfig};
+use super::{Tensor, TensorIteratorConfig};
 use crate::autograd;
 
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -7,7 +7,7 @@ pub enum Reduction {
     Mean,
     Sum,
 }
-fn apply_loss_reduction(unreduced: &NewTensor, reduction: Reduction) -> NewTensor {
+fn apply_loss_reduction(unreduced: &Tensor, reduction: Reduction) -> Tensor {
     match reduction {
         Reduction::None => unreduced.clone(),
         Reduction::Mean => unreduced.mean(),
@@ -16,13 +16,13 @@ fn apply_loss_reduction(unreduced: &NewTensor, reduction: Reduction) -> NewTenso
 }
 
 pub fn binary_cross_entropy(
-    input: &NewTensor,
-    target: &NewTensor,
-    _weight: Option<&NewTensor>,
+    input: &Tensor,
+    target: &Tensor,
+    _weight: Option<&Tensor>,
     _reduction: Reduction,
-) -> NewTensor {
+) -> Tensor {
     let mut _loss = autograd::empty_like(input, None, None);
-    let _iter = NewTensorIteratorConfig::default()
+    let _iter = TensorIteratorConfig::default()
         .add_output(&_loss)
         .add_input(input)
         .add_input(target)
@@ -48,29 +48,29 @@ pub fn binary_cross_entropy(
 }
 
 pub fn binary_cross_entropy_backward(
-    grad: &NewTensor,
-    input: &NewTensor,
-    target: &NewTensor,
-    weight: Option<&NewTensor>,
+    grad: &Tensor,
+    input: &Tensor,
+    target: &Tensor,
+    weight: Option<&Tensor>,
     reduction: Reduction,
-) -> NewTensor {
+) -> Tensor {
     let mut grad_input = autograd::empty_like(input, None, None);
     binary_cross_entropy_backward_out(&mut grad_input, grad, input, target, weight, reduction);
     grad_input
 }
 
 pub fn binary_cross_entropy_backward_out(
-    grad_input: &mut NewTensor,
-    grad: &NewTensor,
-    input: &NewTensor,
-    target: &NewTensor,
-    weight: Option<&NewTensor>,
+    grad_input: &mut Tensor,
+    grad: &Tensor,
+    input: &Tensor,
+    target: &Tensor,
+    weight: Option<&Tensor>,
     reduction: Reduction,
 ) {
     // eprintln!("Grad: {:?}", grad);
     const EPSILON: f64 = 1e-12;
 
-    let _iter = NewTensorIteratorConfig::default()
+    let _iter = TensorIteratorConfig::default()
         .add_output(grad_input)
         .add_input(grad)
         .add_input(input)
@@ -101,19 +101,19 @@ pub fn binary_cross_entropy_backward_out(
 // #[cfg(test)]
 // mod test {
 //     use crate::tensor;
-//     use crate::tensor::{loss::Reduction, sigmoid, NewTensor};
+//     use crate::tensor::{loss::Reduction, sigmoid, Tensor};
 //     #[test]
 //     fn bce_loss_test() {
-//         let input = NewTensor::from_scalar(&[2, 3], 2.0, false);
-//         let target = NewTensor::from_scalar(&[2, 3], 1.0, false);
+//         let input = Tensor::from_scalar(&[2, 3], 2.0, false);
+//         let target = Tensor::from_scalar(&[2, 3], 1.0, false);
 //         let result = super::binary_cross_entropy(&sigmoid(&input), &target, None, Reduction::Mean);
 //         println!("BCE Result: {:?}", result);
 //     }
 
 //     #[test]
 //     fn bce_loss_backward_test() {
-//         let input = NewTensor::from_scalar(&[2, 3], 1.0, true);
-//         let target = NewTensor::from_scalar(&[2, 3], 1.0, false);
+//         let input = Tensor::from_scalar(&[2, 3], 1.0, true);
+//         let target = Tensor::from_scalar(&[2, 3], 1.0, false);
 //         let result = tensor::binary_cross_entropy(&sigmoid(&input), &target, None, Reduction::Mean);
 //         println!("BCE Result: {:?}", result);
 //         crate::autograd::backward::backward(&vec![result], &vec![], false);

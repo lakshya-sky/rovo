@@ -35,7 +35,7 @@ pub fn infer_size(a: &[usize], b: &[usize]) -> Vec<usize> {
         let dim_a = dims_a as isize - 1 - offset;
         let dim_b = dims_b as isize - 1 - offset;
         let size_a = if dim_a >= 0 { a[dim_a as usize] } else { 1 };
-        let size_b = if dim_a >= 0 { b[dim_b as usize] } else { 1 };
+        let size_b = if dim_b >= 0 { b[dim_b as usize] } else { 1 };
         assert!(
             size_a == size_b || size_a == 1 || size_b == 1,
             "The size of tensor a ({}) must match the size of tensor b ({}) at non-singleton dimension {}",

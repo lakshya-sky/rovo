@@ -1,5 +1,5 @@
 use super::tensor_ops;
-use crate::aten::native;
+use crate::aten::{self, native};
 use crate::c10::{
     type_meta_to_scalar_type, Device, Layout, MemoryFormat, Scalar, ScalarType, Storage,
     TensorOptions, TypeMeta,
@@ -37,21 +37,21 @@ impl Edge {
     }
 }
 #[derive(Clone, Default)]
-pub struct NewTensor {
-    pub _impl: Rc<RefCell<NewTensorImpl>>,
+pub struct Tensor {
+    pub _impl: Rc<RefCell<TensorImpl>>,
 }
 
-unsafe impl Send for NewTensor {}
-unsafe impl Sync for NewTensor {}
+unsafe impl Send for Tensor {}
+unsafe impl Sync for Tensor {}
 
-// impl Default for NewTensor {
+// impl Default for Tensor {
 //     fn default() -> Self {
-//         let impl_ = SINGLETON.get_or_init(|| Self::from_impl(NewTensorImpl::undefined_instance()));
+//         let impl_ = SINGLETON.get_or_init(|| Self::from_impl(TensorImpl::undefined_instance()));
 //         impl_.clone()
 //     }
 // }
-impl NewTensor {
-    pub fn from_impl(_impl: NewTensorImpl) -> Self {
+impl Tensor {
+    pub fn from_impl(_impl: TensorImpl) -> Self {
         Self {
             _impl: Rc::new(RefCell::new(_impl)),
         }
@@ -61,12 +61,12 @@ impl NewTensor {
             _impl: other._impl.clone(),
         }
     }
-    pub fn get_unsafe_tensor_impl(&self) -> &mut NewTensorImpl {
+    pub fn get_unsafe_tensor_impl(&self) -> &mut TensorImpl {
         let t = self._impl.as_ptr();
         unsafe { &mut *t }
     }
 
-    pub fn move_tensor(&mut self, other: NewTensor) {
+    pub fn move_tensor(&mut self, other: Tensor) {
         let impl_ = Rc::try_unwrap(other._impl);
         if let Ok(impl_) = impl_ {
             let tensor_impl = impl_.into_inner();
@@ -107,13 +107,31 @@ impl NewTensor {
     pub fn size(&self, d: usize) -> usize {
         self.get_unsafe_tensor_impl().size(d)
     }
+    pub fn stride(&self, d: usize) -> usize {
+        self.get_unsafe_tensor_impl().stride(d)
+    }
     pub fn resize(
         &self,
         size: &[usize],
         optional_memory_format: Option<crate::c10::MemoryFormat>,
-    ) -> &NewTensor {
+    ) -> &Tensor {
         native::resize(self, size, optional_memory_format)
     }
+    pub fn copy(&self, src: &Self, non_blocking: Option<bool>) -> &Self {
+        native::copy_(self, src, non_blocking.unwrap_or(false))
+    }
+
+    pub fn as_strided(&self, size: &[usize], strides: &[usize]) -> Self {
+        aten::as_strided(self, size, strides, None)
+    }
+
+    pub fn as_strided_(&self, size: &[usize], strides: &[usize]) -> &Self {
+        aten::native::as_strided_(self, size, strides, None)
+    }
+    pub fn contiguous(&self) -> Self {
+        aten::native::contiguous(self)
+    }
+
     pub fn element_size(&self) -> usize {
         self.get_unsafe_tensor_impl().itemsize()
     }
@@ -203,7 +221,7 @@ impl NewTensor {
     }
 
     pub fn randn(_dims: &[usize]) -> Self {
-        // Self::from_impl(NewTensorImpl::randn(dims))
+        // Self::from_impl(TensorImpl::randn(dims))
         todo!()
     }
 
@@ -211,23 +229,29 @@ impl NewTensor {
         tensor_ops::t(self)
     }
 
-    pub fn matmul(&self, _other: &NewTensor, _consume: bool) -> NewTensor {
+    pub fn transpose(&self, dim0: i64, dim1: i64) -> Self {
+        tensor_ops::transpose(self, dim0, dim1)
+    }
+
+    pub fn transpose_(&self, dim0: i64, dim1: i64) -> &Self {
+        tensor_ops::transpose_(self, dim0, dim1)
+    }
+
+    pub fn matmul(&self, other: &Tensor, consume: bool) -> Tensor {
         // println!("Matmul Shapes: {:?} and {:?}", self.sizes(), other.sizes());
-        // super::linear_algebra::matmul(self, other, consume)
+        native::matmul(self, other, consume)
+    }
+
+    pub fn dot(&self, _other: &Tensor) -> Tensor {
+        // super::tensor_ops::dot(self, other)
         todo!()
     }
 
-    pub fn dot(&self, _other: &NewTensor) -> NewTensor {
-        // super::linear_algebra::dot(self, other)
-        todo!()
+    pub fn mm<T: AsRef<Tensor>>(&self, other: T, consume: bool) -> Tensor {
+        super::tensor_ops::mm(self, other, consume)
     }
 
-    pub fn mm(&self, _other: &NewTensor, _consume: bool) -> NewTensor {
-        // super::tensor_ops::mm(self, other, consume)
-        todo!()
-    }
-
-    pub fn add_(&self, other: &NewTensor, _scalar: f64) {
+    pub fn add_(&self, other: &Tensor, _scalar: f64) {
         native::add_out(self, self, other);
     }
 
@@ -239,12 +263,12 @@ impl NewTensor {
         tensor_ops::mean(self)
     }
 
-    pub fn sum_dim(&self, dims: &[usize], keep_dim: bool) -> NewTensor {
+    pub fn sum_dim(&self, dims: &[usize], keep_dim: bool) -> Tensor {
         tensor_ops::sum(self, Some(dims), keep_dim)
     }
 
-    pub fn expand(&self, _size: &[usize]) -> NewTensor {
-        todo!()
+    pub fn expand(&self, size: &[usize], implicit: bool) -> Tensor {
+        aten::native::expand(self, size, implicit)
     }
 
     pub fn detach_(&mut self) -> &Self {
@@ -259,11 +283,11 @@ impl NewTensor {
         self.fill_(0.0)
     }
 
-    pub fn mul_(&mut self, other: &NewTensor) {
+    pub fn mul_(&mut self, other: &Tensor) {
         native::mul_out(self, self, other);
     }
 
-    pub fn div_(&mut self, other: &NewTensor) {
+    pub fn div_(&mut self, other: &Tensor) {
         native::div_out(self, self, other);
     }
 
@@ -274,5 +298,16 @@ impl NewTensor {
             .set_device(self.device())
             .set_layout(self.layout());
         options
+    }
+}
+
+impl AsRef<Self> for Tensor {
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+impl AsRef<Self> for &Tensor {
+    fn as_ref(&self) -> &Self {
+        self
     }
 }

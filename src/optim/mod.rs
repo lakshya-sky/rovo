@@ -3,22 +3,22 @@ use crate::tensor::*;
 
 struct OptimizerOptions {}
 struct OptimizerParamGroup {
-    params: Vec<NewTensor>,
+    params: Vec<Tensor>,
     // options: OptimizerOptions
 }
 
 impl OptimizerParamGroup {
-    pub fn new(params: Vec<NewTensor>) -> Self {
+    pub fn new(params: Vec<Tensor>) -> Self {
         Self { params }
     }
 
-    pub fn params(&self) -> &Vec<NewTensor> {
+    pub fn params(&self) -> &Vec<Tensor> {
         &self.params
     }
 }
 
 trait Optimizer {
-    fn step(&mut self) -> Option<NewTensor>;
+    fn step(&mut self) -> Option<Tensor>;
     fn param_groups(&self) -> &Vec<OptimizerParamGroup>;
     fn zero_grad(&self) {
         for group in self.param_groups() {
@@ -36,7 +36,7 @@ pub struct SGD {
 }
 
 impl SGD {
-    pub fn new(params: Vec<NewTensor>) -> Self {
+    pub fn new(params: Vec<Tensor>) -> Self {
         SGD::new_from_param_group(vec![OptimizerParamGroup::new(params)])
     }
 
@@ -46,7 +46,7 @@ impl SGD {
 }
 
 impl Optimizer for SGD {
-    fn step(&mut self) -> Option<NewTensor> {
+    fn step(&mut self) -> Option<Tensor> {
         let _guard = NoGradGuard::default();
         let weight_decay = 0.0;
         let learning_rate = 0.001;
@@ -80,18 +80,18 @@ impl Optimizer for SGD {
 //     use crate::autograd::backward;
 //     use crate::nn::Module;
 //     use crate::nn::{Functional, Linear};
-//     use crate::tensor::NewTensor;
+//     use crate::tensor::Tensor;
 
 //     #[test]
 //     fn test_sgd_step() {
 //         let linear = Linear::new(2, 1);
 //         let sigmoid = Functional::new(Functional::sigmoid());
 //         let mut sgd = SGD::new(linear.parameters());
-//         let x = NewTensor::from_scalar(&[2, 2], 2.0, true);
+//         let x = Tensor::from_scalar(&[2, 2], 2.0, true);
 //         sgd.zero_grad();
 //         let h = linear.forward(&[&x]);
 //         let y = sigmoid.forward(&[&h]);
-//         let target = NewTensor::ones(&[2, 1]);
+//         let target = Tensor::ones(&[2, 1]);
 //         let result = crate::tensor::binary_cross_entropy(
 //             &y,
 //             &target,

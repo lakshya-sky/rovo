@@ -4,7 +4,7 @@ use std::convert::TryInto;
 use std::ptr::NonNull;
 
 pub fn cpu_serial_kernel<I: Copy, O: num::cast::NumCast, F, const N: usize>(
-    iter: &mut NewTensorIterator,
+    iter: &mut TensorIterator,
     mut op: Closure<I, O, F, N>,
 ) where
     F: FnMut([I; N]) -> O,
@@ -18,7 +18,7 @@ pub fn cpu_serial_kernel<I: Copy, O: num::cast::NumCast, F, const N: usize>(
 }
 
 pub fn cpu_kernel_vec<I: Copy, O: num::cast::NumCast, F, const N: usize>(
-    iter: &mut NewTensorIterator,
+    iter: &mut TensorIterator,
     mut op: Closure<I, O, F, N>,
 ) where
     F: FnMut([I; N]) -> O,

@@ -1,6 +1,20 @@
 //! Variable initialization.
 use crate::core::*;
-use crate::tensor::NewTensor;
+use crate::tensor::Tensor;
+#[derive(Debug, Copy, Clone)]
+pub enum Init {
+    /// Constant value.
+    Const(f64),
+
+    /// Random normal with some mean and standard deviation.
+    Randn { mean: f64, stdev: f64 },
+
+    /// Uniform initialization between some lower and upper bounds.
+    Uniform { lo: f64, up: f64 },
+
+    /// Kaiming uniform initialization.
+    KaimingUniform,
+}
 
 pub enum FanModeType {
     FanIn,
@@ -26,11 +40,11 @@ pub struct Fan {
 }
 
 impl Fan {
-    pub fn new(tensor: &NewTensor) -> Self {
+    pub fn new(tensor: &Tensor) -> Self {
         let in_;
         let out_;
         // Below commented code is actual implementation, needs be added after [] oprator is
-        // implemented for NewTensor. For now the function supports only tensor with two dimensions.
+        // implemented for Tensor. For now the function supports only tensor with two dimensions.
         // let dimensions = tensor.dim();
         // if dimensions == 2 {
         //    in_ = tensor.size(1);
@@ -45,28 +59,28 @@ impl Fan {
     }
 }
 
-pub fn calculate_fan_in_fan_out(tensor: &NewTensor) -> (usize, usize) {
+pub fn calculate_fan_in_fan_out(tensor: &Tensor) -> (usize, usize) {
     let in_ = tensor.size(1);
     let out_ = tensor.size(0);
     (in_, out_)
 }
 
-pub fn kaiming_uniform_(
-    tensor: &NewTensor,
+pub fn kaiming_uniform_<'a>(
+    tensor: &'a Tensor,
     a: f64,
     mode: FanModeType,
     non_linearity: NonlinerityType,
-) -> NewTensor {
+) -> &'a Tensor {
     let _ = NoGradGuard::default();
 
     let std_ = calculate_kaiming_std(&tensor, a, mode, non_linearity);
-    let _bound = (3.0f64).sqrt() * std_;
-    // tensor.uniform_(-bound, bound);
-    tensor.clone()
+    let bound = (3.0f64).sqrt() * std_;
+    tensor.uniform(-bound, bound);
+    tensor
 }
 
 pub fn calculate_kaiming_std(
-    tensor: &NewTensor,
+    tensor: &Tensor,
     a: f64,
     mode: FanModeType,
     non_linearity: NonlinerityType,
@@ -98,14 +112,14 @@ fn calculate_gain(non_linearity: NonlinerityType, param: f64) -> f64 {
 //     #[test]
 //     fn test_uniform() {
 //         manual_seed(0);
-//         let tnsr = NewTensor::empty(&[1, 2]);
+//         let tnsr = Tensor::empty(&[1, 2]);
 //         tnsr.uniform_(0.0, 1.0);
 //         println!("{:?}", tnsr);
 //     }
 //     #[test]
 //     fn test_kaiming_uniform() {
 //         manual_seed(0);
-//         let tnsr = NewTensor::empty(&[3, 4]);
+//         let tnsr = Tensor::empty(&[3, 4]);
 //         let _ = kaiming_uniform_(
 //             &tnsr,
 //             (5.0f64).sqrt(),

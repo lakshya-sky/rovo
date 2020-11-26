@@ -16,11 +16,32 @@ pub use fill::*;
 mod resize;
 pub use resize::*;
 
+mod copy;
+pub use copy::*;
+
+mod dispatch_stub;
+pub use dispatch_stub::*;
+
 mod binary_ops;
 pub use binary_ops::*;
 
+mod unary_ops;
+pub use unary_ops::*;
+
+mod tensor_shape;
+pub use tensor_shape::*;
+
+mod tensor_properties;
+pub use tensor_properties::*;
+
+pub mod cpublas;
+// pub use cpu_blas::*;
+
+mod linear_algebra;
+pub use linear_algebra::*;
+
 use crate::c10::*;
-use crate::tensor::NewTensor;
+use crate::tensor::Tensor;
 #[derive(Default, Clone)]
 pub struct ResultTypeState {
     dim_result: ScalarType,
@@ -28,7 +49,7 @@ pub struct ResultTypeState {
     zero_result: ScalarType,
 }
 
-pub fn update_result_type_state(tensor: &NewTensor, in_state: ResultTypeState) -> ResultTypeState {
+pub fn update_result_type_state(tensor: &Tensor, in_state: ResultTypeState) -> ResultTypeState {
     if !tensor.defined() {
         return in_state;
     }

@@ -1,18 +1,18 @@
 use crate::c10::{DataPtr, StorageImpl};
-use crate::tensor::{NewTensor, NewTensorImpl};
+use crate::tensor::{Tensor, TensorImpl};
 
 pub fn resize<'a>(
-    self_: &'a NewTensor,
+    self_: &'a Tensor,
     size: &[usize],
     _optional_memory_format: Option<crate::c10::MemoryFormat>,
-) -> &'a NewTensor {
+) -> &'a Tensor {
     let stride = None;
     let impl_ = self_.get_unsafe_tensor_impl();
     resize_impl_cpu(impl_, size, stride);
     self_
 }
 
-pub fn resize_impl_cpu(self_: &mut NewTensorImpl, size: &[usize], stride: Option<&[usize]>) {
+pub fn resize_impl_cpu(self_: &mut TensorImpl, size: &[usize], stride: Option<&[usize]>) {
     let storage_size;
     if let Some(_stride_) = stride {
         storage_size = 1;
@@ -25,7 +25,7 @@ pub fn resize_impl_cpu(self_: &mut NewTensorImpl, size: &[usize], stride: Option
     may_be_resize_storage_cpu(self_, storage_size);
 }
 
-pub fn may_be_resize_storage_cpu(self_: &mut NewTensorImpl, new_size: usize) {
+pub fn may_be_resize_storage_cpu(self_: &mut TensorImpl, new_size: usize) {
     if new_size > 0 {
         let new_size_bytes = (new_size + self_.storage_offset()) * self_.dtype().itemsize();
         if new_size_bytes > self_.storage().nbytes() {
@@ -34,7 +34,7 @@ pub fn may_be_resize_storage_cpu(self_: &mut NewTensorImpl, new_size: usize) {
     }
 }
 
-pub fn get_storage_ptr(self_: &NewTensorImpl) -> &mut StorageImpl {
+pub fn get_storage_ptr(self_: &TensorImpl) -> &mut StorageImpl {
     &mut *self_.storage().get_unsafe_storage_impl()
 }
 

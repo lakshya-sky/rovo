@@ -1,4 +1,4 @@
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 pub enum MemoryFormat {
     Contiguous,
     Preserve,

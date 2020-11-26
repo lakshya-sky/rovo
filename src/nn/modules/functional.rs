@@ -1,7 +1,8 @@
-use crate::tensor::{sigmoid, NewTensor};
+use crate::nn::module::Module;
+use crate::tensor::{sigmoid, Tensor};
 
 pub struct Functional {
-    fn_: Box<dyn Fn(&[&NewTensor]) -> NewTensor>,
+    fn_: Box<dyn Fn(&[&Tensor]) -> Tensor>,
 }
 
 impl std::fmt::Debug for Functional {
@@ -11,29 +12,29 @@ impl std::fmt::Debug for Functional {
 }
 
 impl Functional {
-    pub fn new(func: Box<dyn Fn(&[&NewTensor]) -> NewTensor>) -> Self {
+    pub fn new(func: Box<dyn Fn(&[&Tensor]) -> Tensor>) -> Self {
         Self { fn_: func }
     }
 
-    pub fn sigmoid() -> Box<dyn Fn(&[&NewTensor]) -> NewTensor> {
-        Box::new(|t: &[&NewTensor]| sigmoid(t[0]))
+    pub fn sigmoid() -> Box<dyn Fn(&[&Tensor]) -> Tensor> {
+        Box::new(|t: &[&Tensor]| sigmoid(t[0]))
     }
 }
 
-impl super::Module for Functional {
-    fn forward(&self, xs: &[&NewTensor]) -> NewTensor {
+impl Module for Functional {
+    fn forward(&self, xs: &[&Tensor]) -> Tensor {
         (self.fn_)(xs)
     }
 
-    fn parameters(&self) -> Vec<NewTensor> {
+    fn parameters(&self) -> Vec<Tensor> {
         todo!()
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::super::Module;
     use super::Functional;
+    use super::Module;
     use crate::autograd::full;
     #[test]
     fn test_functional_sigmoid() {

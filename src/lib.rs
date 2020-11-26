@@ -1,19 +1,23 @@
-#![allow(dead_code, non_camel_case_types, non_upper_case_globals)]
+#![allow(
+    dead_code,
+    non_camel_case_types,
+    non_upper_case_globals,
+    non_snake_case
+)]
 #![feature(min_const_generics, trace_macros)]
 
 // trace_macros!(true);
+extern crate openblas_src;
 
-extern crate lazy_static;
-
-mod aten;
-mod autograd;
+pub mod aten;
+pub mod autograd;
 pub mod c10;
 mod core;
 mod engine;
 mod nn;
 mod ops;
 mod optim;
-mod tensor;
+pub mod tensor;
 mod util;
 mod util_autograd;
 
@@ -45,21 +49,21 @@ where
     }
 }
 
-fn init_rovo() {
+pub fn init_rovo() {
     c10::init();
 }
 
 #[cfg(test)]
 mod test {
     use super::autograd::*;
-    use super::tensor::*;
     use super::c10::*;
+    use super::tensor::*;
     #[test]
     fn test_backward_add() {
         crate::init_rovo();
         let t = ones(&[2, 2], TensorOptions::with_requires_grad());
         let x = ones(&[2, 2], TensorOptions::with_requires_grad());
-        let res: NewTensor = &t + &x;
+        let res: Tensor = &t + &x;
         backward(&vec![res], &vec![], false);
         println!("{:?}", t.grad());
         println!("{:?}", x.grad());
@@ -69,7 +73,7 @@ mod test {
         crate::init_rovo();
         let t = full(&[2, 2], 7.0, TensorOptions::with_requires_grad());
         let x = full(&[2, 2], 3.0, TensorOptions::with_requires_grad());
-        let res: NewTensor = &t * &x;
+        let res: Tensor = &t * &x;
         dbg!(&res);
         backward(&vec![res], &vec![], false);
         println!("{:?}", t.grad());
@@ -81,7 +85,7 @@ mod test {
         crate::init_rovo();
         let t = full(&[2, 2], 7.0, TensorOptions::with_requires_grad());
         let x = full(&[2, 2], 3.0, TensorOptions::with_requires_grad());
-        let add: NewTensor = &t + &x;
+        let add: Tensor = &t + &x;
         let mul = &x * &add;
         backward(&vec![mul], &vec![], false);
         println!("{:?}", t.grad());
@@ -90,8 +94,8 @@ mod test {
 
     // #[test]
     // fn test_backward_sub_div() {
-    //     let t = NewTensor::from_scalar(&[2, 2], 7.0, true);
-    //     let x = NewTensor::from_scalar(&[2, 2], 3.0, true);
+    //     let t = Tensor::from_scalar(&[2, 2], 7.0, true);
+    //     let x = Tensor::from_scalar(&[2, 2], 3.0, true);
     //     let div = &t / &x;
     //     let sub = &x - &div;
     //     backward(&vec![sub], &vec![], false);
@@ -101,21 +105,10 @@ mod test {
     // }
 
     // #[test]
-    // fn test_mm() {
-    //     let x = NewTensor::from_scalar(&[1, 2], 2.0, true);
-    //     let w = NewTensor::from_scalar(&[2, 2], 3.0, true);
-    //     let result = x.mm(&w, true);
-    //     backward(&vec![result], &vec![], false);
-    //     // t.grad().unwrap();
-    //     println!("{:?}", x.grad().unwrap().as_ref());
-    //     println!("{:?}", w.grad().unwrap().as_ref());
-    // }
-
-    // #[test]
     // fn test_matmul() {
-    //     let x = NewTensor::from_scalar(&[1, 2], 2.0, true);
-    //     let w = NewTensor::from_scalar(&[1, 2], 3.0, true);
-    //     let b = NewTensor::from_scalar(&[1], 3.0, true);
+    //     let x = Tensor::from_scalar(&[1, 2], 2.0, true);
+    //     let w = Tensor::from_scalar(&[1, 2], 3.0, true);
+    //     let b = Tensor::from_scalar(&[1], 3.0, true);
     //     let result = x.matmul(&w.t(), true) + b;
     //     backward(&vec![result], &vec![], false);
     //     // t.grad().unwrap();

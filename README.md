@@ -1,15 +1,17 @@
 # Rovo
 
-## Experimental NewTensor Libary in Rust inspired from Pytorch.
+## Experimental Tensor Libary in Rust inspired from Pytorch.
 
 Last:
+
+- Default Linear layer operation assumes f64 dtype.
 
 - Handle case where iterator has no output. loops.rs:execute_op
 
 To-do:
 
 - [x] Empty tensor creation.
-- [x] Read NewTensor by index and print NewTensor.
+- [x] Read Tensor by index and print Tensor.
   - Index trait for [] enforces to return reference while we need value, hence I am using Get trait to get tensor content using get() method.
 - [ ] Make distributions consistent with Pytorch.
 - [ ] Check for backprop and make it consistent with Pytorch.

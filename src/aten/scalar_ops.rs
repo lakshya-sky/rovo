@@ -1,6 +1,6 @@
 use crate::aten::native;
 use crate::c10::*;
-use crate::tensor::NewTensor;
+use crate::tensor::Tensor;
 
 #[inline(always)]
 fn get_device<D: Into<Option<DeviceType>>>(d: D) -> DeviceType {
@@ -11,7 +11,7 @@ fn get_device<D: Into<Option<DeviceType>>>(d: D) -> DeviceType {
 }
 
 #[inline(always)]
-pub fn scalar_to_tensor<D: Into<Option<DeviceType>>>(s: Scalar, device_type: D) -> NewTensor {
+pub fn scalar_to_tensor<D: Into<Option<DeviceType>>>(s: Scalar, device_type: D) -> Tensor {
     let device_type = get_device(device_type);
     match device_type {
         DeviceType::CPU => {

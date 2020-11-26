@@ -1,9 +1,9 @@
 use crate::aten::native::loops;
 use crate::c10::{Scalar, ScalarType};
-use crate::tensor::NewTensorIterator;
+use crate::tensor::TensorIterator;
 use crate::Closure;
 
-pub fn fill_kernel(mut iter: NewTensorIterator, value: Scalar) {
+pub fn fill_kernel(mut iter: TensorIterator, value: Scalar) {
     let scalar_t = iter.dtype();
     match scalar_t {
         ScalarType::Float => {

@@ -6,7 +6,7 @@ trait Get<T> {
     fn get(&self, index: T) -> Self::Output;
 }
 
-impl Get<i64> for NewTensor {
+impl Get<i64> for Tensor {
     type Output = Self;
 
     fn get(&self, index: i64) -> Self::Output {

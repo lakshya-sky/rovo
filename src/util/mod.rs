@@ -1,5 +1,5 @@
 mod ordered_dict;
-use crate::tensor::NewTensor;
+use crate::tensor::Tensor;
 pub use ordered_dict::*;
 
 pub fn is_expandable_to(shape: &[usize], desired: &[usize]) -> bool {
@@ -23,7 +23,7 @@ pub fn is_expandable_to(shape: &[usize], desired: &[usize]) -> bool {
     return true;
 }
 
-pub fn sum_to(mut tensor: NewTensor, shape: &[usize]) -> NewTensor {
+pub fn sum_to(mut tensor: Tensor, shape: &[usize]) -> Tensor {
     if shape.len() == 0 {
         return tensor.sum();
     }

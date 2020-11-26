@@ -29,6 +29,9 @@ impl Device {
             index: index.unwrap_or(-1),
         }
     }
+    pub fn type_(&self) -> DeviceType {
+        self.type_
+    }
 }
 
 impl From<&DeviceType> for Device {

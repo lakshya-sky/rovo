@@ -1,5 +1,5 @@
 use super::*;
-pub fn select(self_: &NewTensor, dim: i64, mut index: i64) -> NewTensor {
+pub fn select(self_: &Tensor, dim: i64, mut index: i64) -> Tensor {
     let ndim = self_.dim();
     if ndim == 0 {
         panic!("Select can't be applied to a 0-dim index");
@@ -28,18 +28,18 @@ pub fn select(self_: &NewTensor, dim: i64, mut index: i64) -> NewTensor {
     result
 }
 pub fn as_strided_tensorimpl(
-    self_: &NewTensor,
+    self_: &Tensor,
     size: &[usize],
     stride: &[usize],
     storage_offset: Option<usize>,
-) -> NewTensor {
+) -> Tensor {
     let storage_offset = storage_offset.unwrap_or_else(|| self_.storage_offset());
     let result = crate::aten::native::make_tensor(self_.storage(), self_.dtype());
     set_strided(&result, size, stride, storage_offset);
     result
 }
 
-pub fn set_strided(self_: &NewTensor, size: &[usize], stride: &[usize], storage_offset: usize) {
+pub fn set_strided(self_: &Tensor, size: &[usize], stride: &[usize], storage_offset: usize) {
     let self_ = self_.get_unsafe_tensor_impl();
     self_.set_storage_offset(storage_offset);
     self_.set_sizes_and_strides(size, stride);

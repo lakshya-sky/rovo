@@ -1,4 +1,7 @@
-use crate::aten::native::*;
+use crate::aten::{
+    self,
+    native::{self, *},
+};
 use crate::autograd::SavedTensor;
 use crate::c10::Scalar;
 use crate::ops::*;
@@ -8,15 +11,15 @@ use std::cell::RefCell;
 use std::ops::{Add, Div, Mul, Neg, Sub};
 use std::rc::Rc;
 
-impl Add<Self> for NewTensor {
+impl Add<Self> for Tensor {
     type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
         &self + &rhs
     }
 }
 
-impl Add<Self> for &NewTensor {
-    type Output = NewTensor;
+impl Add<Self> for &Tensor {
+    type Output = Tensor;
     fn add(self, rhs: Self) -> Self::Output {
         let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
         if util_autograd::compute_requires_grad(&[self, rhs]) {
@@ -39,11 +42,11 @@ impl Add<Self> for &NewTensor {
     }
 }
 
-impl<S> Add<S> for &NewTensor
+impl<S> Add<S> for &Tensor
 where
     S: Into<Scalar>,
 {
-    type Output = NewTensor;
+    type Output = Tensor;
     fn add(self, rhs: S) -> Self::Output {
         let rhs = rhs.into();
         let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
@@ -65,19 +68,19 @@ where
     }
 }
 
-impl<S> Add<S> for NewTensor
+impl<S> Add<S> for Tensor
 where
     S: Into<Scalar>,
 {
-    type Output = NewTensor;
+    type Output = Tensor;
     fn add(self, rhs: S) -> Self::Output {
         let result = &self + rhs;
         result
     }
 }
 
-impl Mul<Self> for &NewTensor {
-    type Output = NewTensor;
+impl Mul<Self> for &Tensor {
+    type Output = Tensor;
     fn mul(self, rhs: Self) -> Self::Output {
         let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
         if util_autograd::compute_requires_grad(&[self, rhs]) {
@@ -101,11 +104,11 @@ impl Mul<Self> for &NewTensor {
     }
 }
 
-impl<S> Mul<S> for &NewTensor
+impl<S> Mul<S> for &Tensor
 where
     S: Into<Scalar>,
 {
-    type Output = NewTensor;
+    type Output = Tensor;
     fn mul(self, rhs: S) -> Self::Output {
         let rhs: Scalar = rhs.into();
         let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
@@ -129,26 +132,26 @@ where
     }
 }
 
-impl<S> Mul<S> for NewTensor
+impl<S> Mul<S> for Tensor
 where
     S: Into<Scalar>,
 {
-    type Output = NewTensor;
+    type Output = Tensor;
     fn mul(self, rhs: S) -> Self::Output {
         let result = &self * rhs;
         result
     }
 }
 
-impl Mul<&Self> for NewTensor {
-    type Output = NewTensor;
+impl Mul<&Self> for Tensor {
+    type Output = Tensor;
     fn mul(self, rhs: &Self) -> Self::Output {
         &self * rhs
     }
 }
 
-impl Sub<Self> for &NewTensor {
-    type Output = NewTensor;
+impl Sub<Self> for &Tensor {
+    type Output = Tensor;
     fn sub(self, rhs: Self) -> Self::Output {
         let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
         if util_autograd::compute_requires_grad(&[&self, &rhs]) {
@@ -168,8 +171,8 @@ impl Sub<Self> for &NewTensor {
     }
 }
 
-impl Div<Self> for &NewTensor {
-    type Output = NewTensor;
+impl Div<Self> for &Tensor {
+    type Output = Tensor;
     fn div(self, rhs: Self) -> Self::Output {
         let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
         if util_autograd::compute_requires_grad(&[self, rhs]) {
@@ -192,15 +195,15 @@ impl Div<Self> for &NewTensor {
     }
 }
 
-impl Div<Self> for NewTensor {
-    type Output = NewTensor;
+impl Div<Self> for Tensor {
+    type Output = Tensor;
     fn div(self, rhs: Self) -> Self::Output {
         &self / &rhs
     }
 }
 
-impl Neg for &NewTensor {
-    type Output = NewTensor;
+impl Neg for &Tensor {
+    type Output = Tensor;
     fn neg(self) -> Self::Output {
         let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
         if util_autograd::compute_requires_grad(&[&self]) {
@@ -211,85 +214,110 @@ impl Neg for &NewTensor {
             _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[&self]));
             grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
         }
-        // let result = -&self._impl.borrow().data;
-        // let _impl = NewTensorImpl {
-        //     data: result,
-        //     autogradmeta: None,
-        //     version_counter: TensorVersion::new(),
-        // };
-        // let result = NewTensor::from_impl(_impl);
-        // if grad_fn.is_some() {
-        //     util_autograd::set_history(&result, grad_fn.unwrap());
-        // }
-        // result
+        let result = neg(self);
 
-        todo!()
+        if grad_fn.is_some() {
+            util_autograd::set_history(&result, grad_fn.unwrap());
+        }
+        result
     }
 }
 
-pub fn t(_self: &NewTensor) -> NewTensor {
+pub fn transpose(self_: &Tensor, dim0: i64, dim1: i64) -> Tensor {
     let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
-    if util_autograd::compute_requires_grad(&[_self]) {
+    if util_autograd::compute_requires_grad(&[self_]) {
         let mut _grad_fn = TBackward {
             next_edges: None,
             input_metadata_: smallvec::smallvec![],
         };
-        _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[_self]));
+        _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[self_]));
         grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
     }
-    // let _impl = _self._impl.borrow().t();
-    // _impl.bump_version();
-    // let result = NewTensor::from_impl(_impl);
-    // if grad_fn.is_some() {
-    //     util_autograd::set_history(&result, grad_fn.unwrap());
-    // }
-    // result
-    todo!()
+
+    let result = native::transpose(self_, dim0, dim1);
+    if grad_fn.is_some() {
+        util_autograd::set_history(&result, grad_fn.unwrap());
+    }
+    result
 }
 
-pub fn mm(_mat1: &NewTensor, _mat2: &NewTensor, _consume: bool) -> NewTensor {
-    // let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
-    // if util_autograd::compute_requires_grad(&[mat1, mat2]) {
-    //     let mut _grad_fn = MmBackward {
-    //         next_edges: None,
-    //         input_metadata_: smallvec::smallvec![],
-    //         self_: None,
-    //         mat2_: None,
-    //         mat2_sizes: vec![],
-    //     };
-    //     _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[mat1, mat2]));
-    //     _grad_fn.self_ = Some(SavedTensor::new(mat1, false));
-    //     if consume {
-    //         _grad_fn.mat2_ = Some(SavedTensor::new_consume(mat2.clone(), false));
-    //     } else {
-    //         _grad_fn.mat2_ = Some(SavedTensor::new(&mat2, false));
-    //     }
-    //     _grad_fn.mat2_sizes = mat2._impl.borrow().data.shape().to_vec();
-
-    //     grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
-    // }
-    // let result = super::linear_algebra::mm(mat1, mat2);
-
-    // // let result = NewTensor::from_impl(_impl);
-    // if grad_fn.is_some() {
-    //     util_autograd::set_history(&result, grad_fn.unwrap());
-    // }
-    // result
-    todo!()
-}
-
-pub fn mean(self_: &NewTensor) -> NewTensor {
+pub fn transpose_(self_: &Tensor, dim0: i64, dim1: i64) -> &Tensor {
     let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
     if util_autograd::compute_requires_grad(&[self_]) {
-        let mut _grad_fn = MeanBackward {
+        let mut _grad_fn = TBackward {
             next_edges: None,
             input_metadata_: smallvec::smallvec![],
-            self_numel: self_.numel(),
-            self_sizes: self_.sizes().to_vec(),
         };
         _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[self_]));
         grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
     }
+
+    let result = native::transpose_(self_, dim0, dim1);
+    if grad_fn.is_some() {
+        util_autograd::set_history(result, grad_fn.unwrap());
+    }
+    result
+}
+
+pub fn t(self_: &Tensor) -> Tensor {
+    let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
+    if util_autograd::compute_requires_grad(&[self_]) {
+        let mut _grad_fn = TBackward {
+            next_edges: None,
+            input_metadata_: smallvec::smallvec![],
+        };
+        _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[self_]));
+        grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
+    }
+
+    let result = native::t(self_);
+    if grad_fn.is_some() {
+        util_autograd::set_history(&result, grad_fn.unwrap());
+    }
+    result
+}
+
+pub fn mm<T: AsRef<Tensor>>(mat1: &Tensor, mat2: T, consume: bool) -> Tensor {
+    let mat2 = mat2.as_ref();
+    let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
+    if util_autograd::compute_requires_grad(&[mat1, mat2]) {
+        let mut _grad_fn = MmBackward {
+            next_edges: None,
+            input_metadata_: smallvec::smallvec![],
+            self_: None,
+            mat2_: None,
+            mat2_sizes: vec![],
+        };
+        _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[mat1, mat2]));
+        _grad_fn.self_ = Some(SavedTensor::new(mat1, false));
+        if consume {
+            _grad_fn.mat2_ = Some(SavedTensor::new_consume(mat2.clone(), false));
+        } else {
+            _grad_fn.mat2_ = Some(SavedTensor::new(&mat2, false));
+        }
+        _grad_fn.mat2_sizes = mat2.sizes().to_vec();
+
+        grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
+    }
+    let result = aten::mm(mat1, mat2);
+    if grad_fn.is_some() {
+        util_autograd::set_history(&result, grad_fn.unwrap());
+    }
+    result
+}
+
+pub fn mean(_self_: &Tensor) -> Tensor {
+    // let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
+    // if util_autograd::compute_requires_grad(&[self_]) {
+    //     let mut _grad_fn = MeanBackward {
+    //         next_edges: None,
+    //         input_metadata_: smallvec::smallvec![],
+    //         self_numel: self_.numel(),
+    //         self_sizes: self_.sizes().to_vec(),
+    //     };
+    //     _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[self_]));
+    //     grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
+    // }
     // let result = super::linear_algebra::mean(self_);
     // if grad_fn.is_some() {
     //     util_autograd::set_history(&self_, grad_fn.unwrap());
@@ -298,16 +326,16 @@ pub fn mean(self_: &NewTensor) -> NewTensor {
     todo!()
 }
 
-pub fn sum(self_: &NewTensor, _dims: Option<&[usize]>, _keep_dim: bool) -> NewTensor {
-    let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
-    if util_autograd::compute_requires_grad(&[self_]) {
-        let mut _grad_fn = AddBackwardTensors {
-            next_edges: None,
-            input_metadata_: smallvec::smallvec![],
-        };
-        _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[self_]));
-        grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
-    }
+pub fn sum(_self_: &Tensor, _dims: Option<&[usize]>, _keep_dim: bool) -> Tensor {
+    // let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
+    // if util_autograd::compute_requires_grad(&[self_]) {
+    //     let mut _grad_fn = AddBackwardTensors {
+    //         next_edges: None,
+    //         input_metadata_: smallvec::smallvec![],
+    //     };
+    //     _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[self_]));
+    //     grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
+    // }
 
     // let result = super::linear_algebra::sum(self_, dims, keep_dim);
 
@@ -319,12 +347,12 @@ pub fn sum(self_: &NewTensor, _dims: Option<&[usize]>, _keep_dim: bool) -> NewTe
     todo!()
 }
 
-pub fn sigmoid(_tensor: &NewTensor) -> NewTensor {
+pub fn sigmoid(_tensor: &Tensor) -> Tensor {
     // let data = tensor.get_tensor_impl().data.clone();
     // let data = data.mapv(f64::exp);
     // // e^x / 1 + e^x instead of 1/1+e^-x
     // let data = data.clone() / (1.0 + data);
-    // let result = NewTensor::from_impl(NewTensorImpl::new_from_array(data, false));
+    // let result = Tensor::from_impl(TensorImpl::new_from_array(data, false));
 
     // let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
     // if util_autograd::compute_requires_grad(&[tensor]) {
@@ -346,11 +374,11 @@ pub fn sigmoid(_tensor: &NewTensor) -> NewTensor {
 }
 
 pub fn binary_cross_entropy(
-    _input: &NewTensor,
-    _target: &NewTensor,
-    _weight: Option<&NewTensor>,
+    _input: &Tensor,
+    _target: &Tensor,
+    _weight: Option<&Tensor>,
     _reduction: super::loss::Reduction,
-) -> NewTensor {
+) -> Tensor {
     // let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
     // if util_autograd::compute_requires_grad(&[input]) {
     //     let mut _grad_fn = BinaryCrossEntropyBackward::default();
