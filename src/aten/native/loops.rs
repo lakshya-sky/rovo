@@ -13,8 +13,8 @@ pub fn cpu_serial_kernel<I: Copy, O: num::cast::NumCast, F, const N: usize>(
         basic_loop(data, strides, 0, n, &mut op);
     };
 
-    let range: Vec<usize> = (0..iter.numel()).collect();
-    iter.serial_for_each(closure, range.as_slice());
+    let range = 0..iter.numel();
+    iter.serial_for_each(closure, range);
 }
 
 pub fn cpu_kernel_vec<I: Copy, O: num::cast::NumCast, F, const N: usize>(

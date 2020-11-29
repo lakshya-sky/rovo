@@ -3,7 +3,7 @@ use crate::aten;
 use crate::autograd;
 use crate::c10::{can_cast, elementSize, Device, DeviceType, ScalarType, TensorOptions, KCPU};
 
-use std::{ffi::c_void, ptr::NonNull};
+use std::{ffi::c_void, ops::Range, ptr::NonNull};
 type DimVector = smallvec::SmallVec<[usize; 5]>;
 type StrideVector = smallvec::SmallVec<[usize; 6]>;
 type LOOP = fn(&[NonNull<u8>], &[usize], usize);
@@ -11,22 +11,22 @@ type LOOP2D = fn(&[NonNull<u8>], &[usize], usize, usize);
 // For now using Tensor type as OperandInfo, but when Tensor supports other types
 // This needs to have a new struct similar to pytorch.
 
-struct DimCounter<'a, 'b> {
+struct DimCounter<'a> {
     shape: &'a [usize],
-    range: &'b [usize],
+    range: Range<usize>,
     values: DimVector,
     offset: usize,
 }
 
-impl<'a, 'b> DimCounter<'a, 'b> {
-    pub fn new(shape: &'a [usize], range: &'b [usize]) -> Self {
+impl<'a> DimCounter<'a> {
+    pub fn new(shape: &'a [usize], range: Range<usize>) -> Self {
         let mut self_ = Self {
             shape,
-            range,
             values: smallvec::smallvec![0; shape.len()],
-            offset: range[0],
+            offset: range.start,
+            range,
         };
-        let mut linear_offset = self_.range[0];
+        let mut linear_offset = self_.range.start;
         let ndim = self_.values.len();
         for dim in 0..ndim {
             let size = self_.shape[dim];
@@ -39,7 +39,7 @@ impl<'a, 'b> DimCounter<'a, 'b> {
         self_
     }
     pub fn is_done(&self) -> bool {
-        self.offset >= self.range[self.range.len() - 1]
+        self.offset >= self.range.end
     }
     pub fn increment(&mut self, step: &[usize; 2]) {
         self.offset += step[0] * step[1];
@@ -71,12 +71,12 @@ impl<'a, 'b> DimCounter<'a, 'b> {
     }
 
     pub fn max_2d_step(&self) -> [usize; 2] {
-        let step0 =
-            (self.shape[0] - self.values[0]).min(self.range[self.range.len() - 1] - self.offset);
+        let step0 = (self.shape[0] - self.values[0]).min(self.range.end - self.offset);
         let mut step1 = 1;
         if step0 == self.shape[0] && self.shape.len() >= 1 {
             step1 = (self.shape[1] - self.values[1])
-                .min((self.range[self.range.len() - 1] - self.offset) / self.shape[0]);
+                .min((self.range.end + 1 - self.offset) / self.shape[0]);
+            // range[..]+1 is used to get one element greater than last element because c++ uses range instead of slice where range.end will give this behavior.
         }
         [step0, step1]
     }
@@ -847,12 +847,12 @@ impl TensorIterator {
         if numel == 0 {
             return;
         } else if numel < 32768 {
-            let range: Vec<usize> = (0..numel).collect();
-            return self.serial_for_each_2d(loop_, range.as_slice());
+            let range = 0..numel;
+            return self.serial_for_each_2d(loop_, range);
         }
     }
 
-    pub fn serial_for_each<F>(&self, mut loop_: F, range: &[usize])
+    pub fn serial_for_each<F>(&self, mut loop_: F, range: Range<usize>)
     where
         F: FnMut(&[NonNull<u8>], &[usize], usize),
     {
@@ -875,7 +875,7 @@ impl TensorIterator {
         self.serial_for_each_2d(loop_2d, range);
     }
 
-    fn serial_for_each_2d<F>(&self, mut loop_: F, range: &[usize])
+    fn serial_for_each_2d<F>(&self, mut loop_: F, range: Range<usize>)
     where
         F: FnMut(&[NonNull<u8>], &[usize], usize, usize),
     {
@@ -891,7 +891,7 @@ impl TensorIterator {
         }
         let base_ptrs = self.get_base_ptrs();
         if self.ndim() <= 1 {
-            let ptrs = self.get_data_ptrs(&base_ptrs, &[range[0]]);
+            let ptrs = self.get_data_ptrs(&base_ptrs, &[range.start]);
             loop_(ptrs.as_slice(), strides.as_slice(), range.len(), 1);
         } else {
             let mut counter = DimCounter::new(self.shape_.as_slice(), range);

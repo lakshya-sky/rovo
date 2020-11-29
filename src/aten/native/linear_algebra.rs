@@ -16,7 +16,6 @@ pub fn addmm_impl_cpu_(
     beta: Scalar,
     alpha: Scalar,
 ) {
-    dbg!(self_, &m1, &m2);
     assert!(self_.dim() == 2 && m1.dim() == 2 && m2.dim() == 2);
     let _m1 = m1.clone();
     let _m2 = m2.clone();
@@ -143,11 +142,9 @@ pub fn addmm_impl_cpu_(
             ldc,
         );
     });
-    println!("{:?}", c);
     if !c.is_same(result) {
         result.copy(&c, None);
     }
-    dbg!(result);
 }
 
 pub fn addmm_cpu_out<'a, S: Into<Scalar>>(

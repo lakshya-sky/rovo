@@ -521,6 +521,7 @@ pub struct MmBackward {
 fn maybe_mutliply(t: Tensor, alpha: Scalar) -> Tensor {
     t
 }
+
 fn mm_mat1_backward(
     grad: &Tensor,
     mat2: &Tensor,
@@ -559,6 +560,73 @@ impl NodeTrait for MmBackward {
         // mat1.t().mm(grad, false);
         let mat1_grad = mm_mat1_backward(grad, &mat2, &mat1, 1);
         // grad.mm(&mat2.t(), false);
+        vec![mat1_grad, mat2_grad]
+    }
+
+    fn set_next_edges(&mut self, edges: Vec<Edge>) {
+        self.next_edges = Some(edges)
+    }
+
+    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+        let input_nr = self.input_metadata_.len();
+        self.input_metadata_
+            .push(InputMetaData::from_tensor(tensor));
+        input_nr
+    }
+
+    fn next_edges(&self) -> Option<&EdgeList> {
+        self.next_edges.as_ref()
+    }
+
+    fn next_edge(&self, i: usize) -> Option<Edge> {
+        let edges = self.next_edges.as_ref().unwrap();
+        let e = edges.get(i).and_then(|e| Some(e.clone()));
+        e
+    }
+
+    fn num_inputs(&self) -> usize {
+        self.input_metadata_.len()
+    }
+
+    fn num_outputs(&self) -> usize {
+        self.next_edges.as_ref().unwrap().len()
+    }
+
+    fn input_metadata(&self, index: usize) -> &InputMetaData {
+        self.input_metadata_.get(index).unwrap()
+    }
+
+    fn debug_print(&self) -> String {
+        "MmBackward".to_string()
+    }
+}
+
+pub struct AddmmBackward {
+    pub input_metadata_: SmallVec<[InputMetaData; 2]>,
+    pub next_edges: Option<EdgeList>,
+
+    pub mat1_: Option<SavedTensor>,
+    pub mat2_: Option<SavedTensor>,
+    pub mat2_sizes: Vec<usize>,
+    pub alpha: Scalar,
+    pub beta: Scalar,
+}
+
+impl NodeTrait for AddmmBackward {
+    fn call(&mut self, grads: Vec<Tensor>) -> Vec<Tensor> {
+        let grad = grads.first().unwrap();
+        let mat1 = self.mat1_.as_ref().unwrap().unpack();
+        let mat2 = self.mat2_.as_ref().unwrap().unpack();
+        //Todo: imlement and use mm_mat2_backward and mm_mat1_backward
+        let mat2_grad = mm_mat2_backward(
+            grad,
+            &mat1,
+            self.mat2_sizes.as_slice(),
+            mat2.strides(),
+            self.alpha,
+        );
+        let mat1_grad = mm_mat1_backward(grad, &mat2, &mat1, self.alpha);
+        // let self_grad = maybe_mutliply(grad.clone(), self.beta);
         vec![mat1_grad, mat2_grad]
     }
 

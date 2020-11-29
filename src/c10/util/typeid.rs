@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use once_cell::sync::OnceCell;
 #[derive(Debug, Copy, Clone, Default)]
 pub struct TypeMeta {
@@ -8,14 +10,10 @@ impl TypeMeta {
     pub fn itemsize(&self) -> usize {
         self.data.as_ref().unwrap().itemsize
     }
-    pub fn make<T>() -> Self {
-        let data = match std::any::type_name::<T>() {
-            "f32" => type_meta_data_instance_float(),
-            "i32" => todo!(),
-            _ => panic!(),
-        };
-
-        Self { data: Some(data) }
+    pub fn make<T: Trait>() -> TypeMeta {
+        TypeMeta {
+            data: Some(T::make()),
+        }
     }
 }
 
@@ -26,14 +24,38 @@ impl std::cmp::PartialEq<TypeMeta> for &TypeMeta {
     }
 }
 #[derive(Debug, Copy, Clone)]
-struct TypeMetaData {
+pub struct TypeMetaData {
     name: &'static str,
     itemsize: usize,
 }
 
-fn type_meta_data_instance_float() -> &'static TypeMetaData {
-    static SINGLETON: OnceCell<TypeMetaData> = OnceCell::new();
-    SINGLETON.get_or_init(|| make_type_meta_data_instance::<f32>())
+pub trait Trait {
+    fn make() -> &'static TypeMetaData;
+}
+
+impl Trait for f32 {
+    fn make() -> &'static TypeMetaData {
+        static SINGLETON: OnceCell<TypeMetaData> = OnceCell::new();
+        SINGLETON.get_or_init(|| make_type_meta_data_instance::<f32>())
+    }
+}
+impl Trait for i32 {
+    fn make() -> &'static TypeMetaData {
+        static SINGLETON: OnceCell<TypeMetaData> = OnceCell::new();
+        SINGLETON.get_or_init(|| make_type_meta_data_instance::<i32>())
+    }
+}
+impl Trait for f64 {
+    fn make() -> &'static TypeMetaData {
+        static SINGLETON: OnceCell<TypeMetaData> = OnceCell::new();
+        SINGLETON.get_or_init(|| make_type_meta_data_instance::<f64>())
+    }
+}
+impl Trait for i64 {
+    fn make() -> &'static TypeMetaData {
+        static SINGLETON: OnceCell<TypeMetaData> = OnceCell::new();
+        SINGLETON.get_or_init(|| make_type_meta_data_instance::<i64>())
+    }
 }
 
 fn make_type_meta_data_instance<T>() -> TypeMetaData {

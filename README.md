@@ -3,8 +3,7 @@
 ## Experimental Tensor Libary in Rust inspired from Pytorch.
 
 Last:
-
-- Default Linear layer operation assumes f64 dtype.
+- AddmmBackward maybe_multiply.
 
 - Handle case where iterator has no output. loops.rs:execute_op
 

@@ -68,7 +68,6 @@ impl Linear {
             let bound = 1.0 / (fan_in as f64).sqrt();
             bs.uniform(-bound, bound)
         }
-        dbg!(&self.ws, &self.bs);
     }
 }
 
@@ -103,11 +102,12 @@ mod test {
         crate::init_rovo();
         manual_seed(0);
         let linear = Linear::new(4, 3);
-        // let x = autograd::full(&[2, 4], 1.5, TensorOptions::with_requires_grad());
+        let x = autograd::full(&[2, 4], 1.5, TensorOptions::with_requires_grad());
         let y = linear.forward(&[&x]);
+        // Expected: [[-1.2501948, 0.16091841, -0.448294], [-1.2501948, 0.16091841, -0.448294]]
         println!("Result: {:?}", y);
-        // backward::backward(&vec![y], &vec![], false);
-        // println!("Input Grad: {:?}", x.grad());
+        backward::backward(&vec![y], &vec![], false);
+        println!("Input Grad: {:?}", x.grad());
         // let ws_grad = linear.ws.get_tensor_impl().grad();
         // assert!(ws_grad.is_some());
         // assert!(

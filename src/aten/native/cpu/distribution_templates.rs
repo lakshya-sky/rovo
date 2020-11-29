@@ -1,18 +1,18 @@
+use crate::aten::native;
 use crate::c10::ScalarType;
 use crate::core::*;
 use crate::tensor::{Tensor, TensorIterator};
 use crate::Closure;
+use crate::{AT_DISPATCH_FLOATING_TYPES_AND2, AT_PRIVATE_CASE_TYPE};
 
-pub fn uniform_kernel(
-    mut iter: TensorIterator,
-    from: f64,
-    to: f64,
-    gen: &mut dyn GeneratorImpl,
-) {
-    let uniform = UniformRealDistribution::new(from, to);
-    let closure = Closure::new(|_args: [f64; 0]| uniform.call(gen));
-
-    crate::aten::native::cpu_serial_kernel(&mut iter, closure);
+pub fn uniform_kernel(mut iter: TensorIterator, from: f64, to: f64, gen: &mut dyn GeneratorImpl) {
+    AT_DISPATCH_FLOATING_TYPES_AND2!(iter.dtype(), "uniform_cpu_kernel", || {
+        let from = from as SCALART;
+        let to = to as SCALART;
+        let uniform = UniformRealDistribution::new(from, to);
+        let closure = Closure::new(|_args: [f64; 0]| uniform.call(gen));
+        native::cpu_serial_kernel(&mut iter, closure);
+    });
 }
 pub struct NormalKernel;
 

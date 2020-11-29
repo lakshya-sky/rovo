@@ -306,6 +306,39 @@ pub fn mm<T: AsRef<Tensor>>(mat1: &Tensor, mat2: T, consume: bool) -> Tensor {
     result
 }
 
+pub fn addmm(
+    self_: &Tensor,
+    mat1: &Tensor,
+    mat2: &Tensor,
+    alpha: impl Into<Scalar>,
+    beta: impl Into<Scalar>,
+) -> Tensor {
+    let alpha: Scalar = alpha.into();
+    let beta: Scalar = beta.into();
+    let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
+    if util_autograd::compute_requires_grad(&[self_, mat1, mat2]) {
+        let mut _grad_fn = AddmmBackward {
+            next_edges: None,
+            input_metadata_: smallvec::smallvec![],
+            mat1_: None,
+            mat2_: None,
+            mat2_sizes: vec![],
+            alpha,
+            beta,
+        };
+        _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[mat1, mat2]));
+        _grad_fn.mat1_ = Some(SavedTensor::new(mat1, false));
+        _grad_fn.mat2_ = Some(SavedTensor::new(mat2, false));
+        _grad_fn.mat2_sizes = mat2.sizes().to_vec();
+        grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
+    }
+    let result = aten::addmm(self_, mat1, mat2, alpha, beta);
+    if grad_fn.is_some() {
+        util_autograd::set_history(&result, grad_fn.unwrap());
+    }
+    result
+}
+
 pub fn mean(_self_: &Tensor) -> Tensor {
     // let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
     // if util_autograd::compute_requires_grad(&[self_]) {
