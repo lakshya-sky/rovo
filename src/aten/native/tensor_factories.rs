@@ -1,6 +1,6 @@
 use crate::aten::native;
 use crate::aten::util::prod_intlist;
-use crate::c10::{MemoryFormat, Scalar, Storage, StorageImpl, TensorOptions, TypeMeta, KCPU};
+use crate::c10::{MemoryFormat, Scalar, Storage, StorageImpl, TensorOptions, TypeMeta};
 use crate::core::get_cpu_allocator;
 use crate::tensor::{Tensor, TensorImpl};
 
@@ -82,7 +82,7 @@ pub fn full<A: AsRef<TensorOptions>>(
     result
 }
 
-pub fn full_out<'a>(result: &'a Tensor, size: &[usize], fill_value: f32) -> &'a Tensor {
+pub fn full_out<'a>(result: &'a Tensor, size: &[usize], fill_value: f32) {
     result.resize(size, None);
     result.fill_(fill_value)
 }
@@ -103,7 +103,7 @@ pub fn ones<A: AsRef<TensorOptions>>(size: &[usize], options: A) -> Tensor {
     full(size, 1.0, options)
 }
 
-pub fn ones_out<'a>(result: &'a Tensor, size: &[usize]) -> &'a Tensor {
+pub fn ones_out<'a>(result: &'a Tensor, size: &[usize]) {
     full_out(result, size, 1.)
 }
 
@@ -127,7 +127,7 @@ pub fn make_tensor<T: Into<Storage>>(storage: T, dtype: &TypeMeta) -> Tensor {
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Scalar Tensor ~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 pub fn scalar_tensor<A: AsRef<TensorOptions>>(s: Scalar, options: A) -> Tensor {
     let options = options.as_ref();
-    if options.device() == KCPU {
+    if options.device().is_cpu() {
         let result = empty_cpu(&[], options, None);
         result.fill_(s);
         return result;

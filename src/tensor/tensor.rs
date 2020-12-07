@@ -1,3 +1,5 @@
+use native::wrapped_scalar_tensor;
+
 use super::tensor_ops;
 use crate::aten::{self, native};
 use crate::c10::{
@@ -86,9 +88,10 @@ impl Tensor {
         self.get_unsafe_tensor_impl().storage()
     }
 
-    pub fn fill_(&self, value: impl Into<Scalar>) -> &Self {
+    pub fn fill_(&self, value: impl Into<Scalar>) {
         crate::aten::native::fill_(self, value)
     }
+
     pub fn sizes(&self) -> &[usize] {
         self.get_unsafe_tensor_impl().sizes()
     }
@@ -184,6 +187,10 @@ impl Tensor {
         }
     }
 
+    pub fn is_non_overlapping_and_dense(&self) -> bool {
+        self.get_unsafe_tensor_impl().is_non_overlapping_and_dense()
+    }
+
     pub fn tensor_data(&self) -> Self {
         TensorHook::tensor_data(self)
     }
@@ -218,6 +225,9 @@ impl Tensor {
 
     pub fn uniform_with_gen(&self, from: f64, to: f64, gen: Option<Generator>) {
         crate::aten::native::distribution_templates::uniform_impl_(self, from, to, gen);
+    }
+    pub fn unsqueeze(&self, _i: usize) -> Self {
+        todo!()
     }
 
     pub fn randn(_dims: &[usize]) -> Self {
@@ -256,7 +266,7 @@ impl Tensor {
     }
 
     pub fn sum(&self) -> Self {
-        tensor_ops::sum(self, None, false)
+        tensor_ops::sum(self, None)
     }
 
     pub fn mean(&self) -> Self {
@@ -264,9 +274,11 @@ impl Tensor {
     }
 
     pub fn sum_dim(&self, dims: &[usize], keep_dim: bool) -> Tensor {
-        tensor_ops::sum(self, Some(dims), keep_dim)
+        tensor_ops::sum_dim_int_list(self, dims, keep_dim)
     }
 
+    /// Implicit flag is false by default, and is only true for
+    /// oprations which broadcasts tensor implicitly.
     pub fn expand(&self, size: &[usize], implicit: bool) -> Tensor {
         aten::native::expand(self, size, implicit)
     }
@@ -279,16 +291,24 @@ impl Tensor {
         self
     }
 
-    pub fn zero_(&mut self) -> &Self {
+    pub fn zero_(&mut self) {
         self.fill_(0.0)
     }
 
-    pub fn mul_(&mut self, other: &Tensor) {
-        native::mul_out(self, self, other);
+    pub fn mul_<A: AsRef<Self>>(&mut self, other: A) {
+        native::mul_out(self, self, other.as_ref());
     }
 
-    pub fn div_(&mut self, other: &Tensor) {
-        native::div_out(self, self, other);
+    pub fn mul_scalar<S: Into<Scalar>>(&mut self, other: S) {
+        self.mul_(wrapped_scalar_tensor(other.into()));
+    }
+
+    pub fn div_<A: AsRef<Self>>(&mut self, other: A) {
+        native::div_out(self, self, other.as_ref());
+    }
+
+    pub fn div_scalar<S: Into<Scalar>>(&mut self, other: S) {
+        self.div_(wrapped_scalar_tensor(other.into()));
     }
 
     pub fn options(&self) -> TensorOptions {
@@ -298,6 +318,30 @@ impl Tensor {
             .set_device(self.device())
             .set_layout(self.layout());
         options
+    }
+    pub fn to_dtype(&self, dtype: ScalarType) -> Self {
+        native::to_dtype(self, dtype, false, false, None)
+    }
+    /// Defaults:
+    ///     channels_last_strides_exact_match: false
+    pub fn suggest_memory_format(&self, channels_last_strides_exact_match: bool) -> MemoryFormat {
+        // Setting channels_last_strides_exact_match to true forces function to
+        // check 0,1 - sized dimension strides.
+        //   if !self.is_mkldnn() && !self.is_sparse() {
+        //     if (impl_->is_strides_like_channels_last()) {
+        //       if (!channels_last_strides_exact_match ||
+        //           get_channels_last_strides_2d(sizes()) == strides()) {
+        //         return at::MemoryFormat::ChannelsLast;
+        //       }
+        //     }
+        //     else if (impl_->is_strides_like_channels_last_3d()) {
+        //       if (!channels_last_strides_exact_match ||
+        //           get_channels_last_strides_3d(sizes()) == strides()) {
+        //         return at::MemoryFormat::ChannelsLast3d;
+        //       }
+        //     }
+        //   }
+        return MemoryFormat::Contiguous;
     }
 }
 

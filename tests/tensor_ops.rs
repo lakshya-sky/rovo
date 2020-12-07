@@ -1,4 +1,3 @@
-use rovo::aten;
 use rovo::autograd;
 use rovo::c10::TensorOptions;
 
@@ -27,6 +26,14 @@ fn test_neg() {
     let t = autograd::full(&[2, 2], 1.0, TensorOptions::with_requires_grad());
     let r = -&t;
     println!("{:?}", r);
+}
+
+#[test]
+fn test_div_scalar() {
+    rovo::init_rovo();
+    let mut x = autograd::full(&[2, 2], 3.0, TensorOptions::with_requires_grad());
+    x.div_scalar(2.0);
+    println!("test_div_scalar_result: {:?}", x);
 }
 
 #[test]

@@ -102,33 +102,19 @@ mod test {
         crate::init_rovo();
         manual_seed(0);
         let linear = Linear::new(4, 3);
-        let x = autograd::full(&[2, 4], 1.5, TensorOptions::with_requires_grad());
+        let x = autograd::full(&[2, 4], 3.0, TensorOptions::with_requires_grad());
         let y = linear.forward(&[&x]);
-        // Expected: [[-1.2501948, 0.16091841, -0.448294], [-1.2501948, 0.16091841, -0.448294]]
+        // Expected: [[-2.0227153, 0.6529779, -0.6904765],[ -2.0227153, 0.6529779, -0.6904765]]
         println!("Result: {:?}", y);
+        //Expected : -0.686738
+        println!("Mean: {:?}", y.mean());
+
         backward::backward(&vec![y], &vec![], false);
+
+        //Expected : [
+        //           [-0.04011544, 0.08910112, -0.09542262, -0.011634579],
+        //           [-0.04011544, 0.08910112, -0.09542262, -0.011634579]
+        //          ]
         println!("Input Grad: {:?}", x.grad());
-        // let ws_grad = linear.ws.get_tensor_impl().grad();
-        // assert!(ws_grad.is_some());
-        // assert!(
-        //     ws_grad
-        //         .as_ref()
-        //         .unwrap()
-        //         .borrow()
-        //         .get_tensor_impl()
-        //         .data
-        //         .ndim()
-        //         == 2
-        // );
-        // let result = ws_grad
-        //     .unwrap()
-        //     .borrow()
-        //     .get_tensor_impl()
-        //     .data
-        //     .as_slice()
-        //     .unwrap()
-        //     .to_vec();
-        // let expected = vec![4.0, 4.0];
-        // assert_eq!(result, expected);
     }
 }

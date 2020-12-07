@@ -1,6 +1,10 @@
+mod bitset;
 mod ordered_dict;
-use crate::tensor::Tensor;
+mod vec256;
+
+pub use bitset::*;
 pub use ordered_dict::*;
+pub use vec256::*;
 
 pub fn is_expandable_to(shape: &[usize], desired: &[usize]) -> bool {
     let shape_dim = shape.len();
@@ -21,25 +25,4 @@ pub fn is_expandable_to(shape: &[usize], desired: &[usize]) -> bool {
         i += 1;
     }
     return true;
-}
-
-pub fn sum_to(mut tensor: Tensor, shape: &[usize]) -> Tensor {
-    if shape.len() == 0 {
-        return tensor.sum();
-    }
-    let mut reduce_dims = smallvec::SmallVec::<[usize; 8]>::new();
-    let sizes = tensor.sizes();
-    let leading_dims = sizes.len() - shape.len();
-    for i in 0..leading_dims {
-        reduce_dims.push(i);
-    }
-    for i in leading_dims..sizes.len() {
-        if shape[i - leading_dims] == 1 && sizes[i] != 1 {
-            reduce_dims.push(i);
-        }
-    }
-    if !reduce_dims.is_empty() {
-        tensor = tensor.sum_dim(reduce_dims.as_slice(), true)
-    }
-    tensor
 }

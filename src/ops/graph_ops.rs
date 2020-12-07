@@ -1,7 +1,7 @@
-use crate::autograd::*;
-use crate::c10::Scalar;
+use crate::c10::{Scalar, ScalarType};
 use crate::ops::NodeTrait;
 use crate::tensor::*;
+use crate::{autograd::*, util::BitSet};
 use smallvec::*;
 
 pub struct AccumulateGrad {
@@ -405,6 +405,59 @@ impl NodeTrait for DivBackwardTensors {
     }
 }
 
+pub struct DivBackwardScalar {
+    pub input_metadata_: SmallVec<[InputMetaData; 1]>,
+    pub next_edges: Option<EdgeList>,
+    pub _self: Option<SavedTensor>,
+    pub other: Scalar,
+}
+
+impl NodeTrait for DivBackwardScalar {
+    fn call(&mut self, grads: Vec<Tensor>) -> Vec<Tensor> {
+        let grad = grads.first().unwrap();
+        let other = self.other;
+        let first = grad * other;
+        vec![first]
+    }
+
+    fn set_next_edges(&mut self, edges: Vec<Edge>) {
+        self.next_edges = Some(edges)
+    }
+
+    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+        let input_nr = self.input_metadata_.len();
+        self.input_metadata_
+            .push(InputMetaData::from_tensor(tensor));
+        input_nr
+    }
+
+    fn next_edges(&self) -> Option<&EdgeList> {
+        self.next_edges.as_ref()
+    }
+
+    fn next_edge(&self, i: usize) -> Option<Edge> {
+        let edges = self.next_edges.as_ref().unwrap();
+        let e = edges.get(i).and_then(|e| Some(e.clone()));
+        e
+    }
+
+    fn num_inputs(&self) -> usize {
+        self.input_metadata_.len()
+    }
+
+    fn num_outputs(&self) -> usize {
+        self.next_edges.as_ref().unwrap().len()
+    }
+
+    fn input_metadata(&self, index: usize) -> &InputMetaData {
+        self.input_metadata_.get(index).unwrap()
+    }
+
+    fn debug_print(&self) -> String {
+        "DivBackwardScalar".to_string()
+    }
+}
+
 pub struct NegBackward {
     pub input_metadata_: SmallVec<[InputMetaData; 2]>,
     pub next_edges: Option<EdgeList>,
@@ -518,8 +571,21 @@ pub struct MmBackward {
     pub self_: Option<SavedTensor>,
     pub mat2_: Option<SavedTensor>,
 }
+
 fn maybe_mutliply(t: Tensor, alpha: Scalar) -> Tensor {
-    t
+    let mut is_one = false;
+    if alpha.is_floating_point() {
+        let one: f64 = alpha.to();
+        is_one = one == 1.0;
+    } else if alpha.is_integer() {
+        let one: i64 = alpha.to();
+        is_one = one == 1;
+    }
+    if is_one {
+        t
+    } else {
+        t * alpha
+    }
 }
 
 fn mm_mat1_backward(
@@ -626,8 +692,8 @@ impl NodeTrait for AddmmBackward {
             self.alpha,
         );
         let mat1_grad = mm_mat1_backward(grad, &mat2, &mat1, self.alpha);
-        // let self_grad = maybe_mutliply(grad.clone(), self.beta);
-        vec![mat1_grad, mat2_grad]
+        let self_grad = maybe_mutliply(grad.clone(), self.beta);
+        vec![self_grad, mat1_grad, mat2_grad]
     }
 
     fn set_next_edges(&mut self, edges: Vec<Edge>) {
@@ -679,6 +745,158 @@ impl NodeTrait for SigmoidBackward {
         let grad_input = input.first().unwrap();
         let result = self.result_.as_ref().unwrap().unpack();
         let grad_result = (-&result + 1.0) * &result * grad_input;
+        vec![grad_result]
+    }
+
+    fn set_next_edges(&mut self, edges: Vec<Edge>) {
+        self.next_edges = Some(edges)
+    }
+
+    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+        let input_nr = self.input_metadata_.len();
+        self.input_metadata_
+            .push(InputMetaData::from_tensor(tensor));
+        input_nr
+    }
+
+    fn next_edges(&self) -> Option<&EdgeList> {
+        self.next_edges.as_ref()
+    }
+
+    fn next_edge(&self, i: usize) -> Option<Edge> {
+        let edges = self.next_edges.as_ref().unwrap();
+        let e = edges.get(i).and_then(|e| Some(e.clone()));
+        e
+    }
+
+    fn num_inputs(&self) -> usize {
+        self.input_metadata_.len()
+    }
+
+    fn num_outputs(&self) -> usize {
+        self.next_edges.as_ref().unwrap().len()
+    }
+
+    fn input_metadata(&self, index: usize) -> &InputMetaData {
+        self.input_metadata_.get(index).unwrap()
+    }
+
+    fn debug_print(&self) -> String {
+        "SigmoidBackward".to_string()
+    }
+}
+pub struct SumBackward0 {
+    pub input_metadata_: SmallVec<[InputMetaData; 2]>,
+    pub next_edges: Option<EdgeList>,
+    pub self_sizes: Vec<usize>,
+}
+
+impl NodeTrait for SumBackward0 {
+    fn call(&mut self, grads: Vec<Tensor>) -> Vec<Tensor> {
+        let grad = grads.first().unwrap();
+        let grad_result = grad.expand(self.self_sizes.as_slice(), false);
+        vec![grad_result]
+    }
+
+    fn set_next_edges(&mut self, edges: Vec<Edge>) {
+        self.next_edges = Some(edges)
+    }
+
+    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+        let input_nr = self.input_metadata_.len();
+        self.input_metadata_
+            .push(InputMetaData::from_tensor(tensor));
+        input_nr
+    }
+
+    fn next_edges(&self) -> Option<&EdgeList> {
+        self.next_edges.as_ref()
+    }
+
+    fn next_edge(&self, i: usize) -> Option<Edge> {
+        let edges = self.next_edges.as_ref().unwrap();
+        let e = edges.get(i).and_then(|e| Some(e.clone()));
+        e
+    }
+
+    fn num_inputs(&self) -> usize {
+        self.input_metadata_.len()
+    }
+
+    fn num_outputs(&self) -> usize {
+        self.next_edges.as_ref().unwrap().len()
+    }
+
+    fn input_metadata(&self, index: usize) -> &InputMetaData {
+        self.input_metadata_.get(index).unwrap()
+    }
+
+    fn debug_print(&self) -> String {
+        "SigmoidBackward".to_string()
+    }
+}
+const dim_bitset_size: usize = 64;
+
+#[inline(always)]
+fn dim_list_to_bitset(dims: &[usize], ndims: i64) -> BitSet<dim_bitset_size> {
+    assert!(
+        ndims <= dim_bitset_size as i64,
+        "only tensors with up to {} dims are supported",
+        dim_bitset_size
+    );
+    let mut seen = BitSet::<dim_bitset_size>::default();
+    for i in 0..dims.len() {
+        let dim = maybe_wrap_dim(dims[i] as i64, ndims, false);
+        assert!(
+            !seen.check(dim),
+            "dim {} appears multiple times in the list of dims",
+            dim
+        );
+        seen.assign(dim, true);
+    }
+    return seen;
+}
+
+fn unsqueeze_multiple(t: &Tensor, dim: &[usize], n_dims: usize) -> Tensor {
+    let dims_to_unsqueeze = dim_list_to_bitset(dim, n_dims as i64);
+    let mut res = t.clone();
+    for i in 0..n_dims {
+        if dims_to_unsqueeze.check(i) {
+            res = res.unsqueeze(i);
+        }
+    }
+    return res;
+}
+
+fn sum_backward(grad: &Tensor, sizes: &[usize], dims: &[usize], keepdim: bool) -> Tensor {
+    if !keepdim && sizes.len() > 0 {
+        if dims.len() == 1 {
+            return grad.unsqueeze(dims[0]).expand(sizes, false);
+        } else {
+            let res = unsqueeze_multiple(grad, dims, sizes.len());
+            return res.expand(sizes, false);
+        }
+    } else {
+        return grad.expand(sizes, false);
+    }
+}
+pub struct SumBackward1 {
+    pub input_metadata_: SmallVec<[InputMetaData; 2]>,
+    pub next_edges: Option<EdgeList>,
+    pub dim: Vec<usize>,
+    pub self_sizes: Vec<usize>,
+    pub keep_dim: bool,
+}
+
+impl NodeTrait for SumBackward1 {
+    fn call(&mut self, grads: Vec<Tensor>) -> Vec<Tensor> {
+        let grad = grads.first().unwrap();
+        let grad_result = sum_backward(
+            grad,
+            self.self_sizes.as_slice(),
+            self.dim.as_slice(),
+            self.keep_dim,
+        );
         vec![grad_result]
     }
 
@@ -801,6 +1019,7 @@ pub struct MeanBackward {
     pub next_edges: Option<EdgeList>,
     pub self_sizes: Vec<usize>,
     pub self_numel: usize,
+    pub self_scalar_type: ScalarType,
 }
 
 impl NodeTrait for MeanBackward {

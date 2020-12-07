@@ -2,7 +2,7 @@ use super::make_tensor;
 use crate::aten;
 use crate::tensor::{maybe_wrap_dim, Tensor};
 
-pub fn expand(self_: &Tensor, size: &[usize], implicit: bool) -> Tensor {
+pub fn expand(self_: &Tensor, size: &[usize], _implicit: bool) -> Tensor {
     let (expandedSizes, expandedStrides) =
         aten::infer_expand_geometry(self_.sizes(), self_.strides(), size);
     let result = self_.as_strided(expandedSizes.as_slice(), expandedStrides.as_slice());

@@ -4,7 +4,7 @@
     non_upper_case_globals,
     non_snake_case
 )]
-#![feature(min_const_generics, trace_macros)]
+#![feature(min_const_generics, trace_macros, int_bits_const)]
 
 // trace_macros!(true);
 extern crate openblas_src;
@@ -22,28 +22,42 @@ mod util;
 mod util_autograd;
 
 use std::marker::PhantomData;
-pub struct Closure<I, O, F, const N: usize>
-where
-    F: FnMut([I; N]) -> O,
-{
+pub struct Closure<I, O, F, const N: usize> {
     f: F,
-    pub arity: usize,
+    arity: usize,
     _in: PhantomData<I>,
     _out: PhantomData<O>,
+    input_type_size: usize,
+    output_type_size: usize,
 }
 
-impl<I, O, F, const N: usize> Closure<I, O, F, N>
-where
-    F: FnMut([I; N]) -> O,
-{
+impl<I, O, F, const N: usize> Closure<I, O, F, N> {
     pub fn new(f: F) -> Self {
         Self {
             f,
             arity: N,
             _in: PhantomData,
             _out: PhantomData,
+            input_type_size: std::mem::size_of::<I>(),
+            output_type_size: std::mem::size_of::<O>(),
         }
     }
+
+    pub fn input_type_size(&self) -> usize {
+        self.input_type_size
+    }
+    pub fn output_type_size(&self) -> usize {
+        self.output_type_size
+    }
+    pub fn arity(&self) -> usize {
+        self.arity
+    }
+}
+
+impl<I, O, F, const N: usize> Closure<I, O, F, N>
+where
+    F: FnMut([I; N]) -> O,
+{
     pub fn call(&mut self, args: [I; N]) -> O {
         (self.f)(args)
     }

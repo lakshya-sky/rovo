@@ -1,13 +1,20 @@
+use aten::GRAIN_SIZE;
+use autograd::empty_like;
+
 use super::Tensor;
 use crate::aten;
 use crate::autograd;
 use crate::c10::{can_cast, elementSize, Device, DeviceType, ScalarType, TensorOptions, KCPU};
+use crate::util::BitSet;
 
 use std::{ffi::c_void, ops::Range, ptr::NonNull};
-type DimVector = smallvec::SmallVec<[usize; 5]>;
+
+pub type DimMask = BitSet<64>;
+pub type DimVector = smallvec::SmallVec<[usize; 5]>;
 type StrideVector = smallvec::SmallVec<[usize; 6]>;
 type LOOP = fn(&[NonNull<u8>], &[usize], usize);
 type LOOP2D = fn(&[NonNull<u8>], &[usize], usize, usize);
+type LOOP_SUBITER = fn(&TensorIterator);
 // For now using Tensor type as OperandInfo, but when Tensor supports other types
 // This needs to have a new struct similar to pytorch.
 
@@ -41,7 +48,7 @@ impl<'a> DimCounter<'a> {
     pub fn is_done(&self) -> bool {
         self.offset >= self.range.end
     }
-    pub fn increment(&mut self, step: &[usize; 2]) {
+    pub fn increment(&mut self, step: [usize; 2]) {
         self.offset += step[0] * step[1];
         let ndim = self.values.len();
         let mut overflow = step[0];
@@ -85,11 +92,12 @@ impl<'a> DimCounter<'a> {
 // For now using Tensor type as OperandInfo, but when Tensor supports other types
 // This needs to have a new struct similar to pytorch.
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct NewOperandInfo {
     is_output: bool,
     is_read_write: bool,
     tensor: Tensor,
+    original_tensor: Option<Tensor>,
     stride_bytes: StrideVector,
     data: Option<NonNull<c_void>>,
     device: Device,
@@ -105,6 +113,7 @@ impl NewOperandInfo {
                 is_output: false,
                 is_read_write: false,
                 tensor,
+                original_tensor: None,
                 stride_bytes: StrideVector::new(),
                 data: None,
                 target_dtype: target_dtype,
@@ -116,6 +125,7 @@ impl NewOperandInfo {
                 is_output: false,
                 is_read_write: false,
                 tensor,
+                original_tensor: None,
                 stride_bytes: StrideVector::new(),
                 data: None,
                 target_dtype: ScalarType::Undefined,
@@ -140,9 +150,10 @@ enum FastSetupType {
     CHANNELSLAST,
     NONOVERLAPPINGDENSE,
 }
+
 // TensorIterator currently doesn't support the feature of having a Tensor
 // both as an input and output.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct TensorIterator {
     shape_: DimVector,
     operands_: smallvec::SmallVec<[NewOperandInfo; 4]>,
@@ -152,9 +163,64 @@ pub struct TensorIterator {
     has_coalesced_dimensions: bool,
     common_dtype_: ScalarType,
     perm: DimVector,
+    view_offsets: DimVector,
 }
 
 impl TensorIterator {
+    fn ndim(&self) -> usize {
+        self.shape_.len()
+    }
+
+    pub fn numel(&self) -> usize {
+        self.shape_.iter().product()
+    }
+    pub fn noutputs(&self) -> usize {
+        self.num_outputs_
+    }
+
+    pub fn ninputs(&self) -> usize {
+        self.ntensors() - self.noutputs()
+    }
+
+    pub fn view_offsets(&self) -> &[usize] {
+        self.view_offsets.as_slice()
+    }
+
+    pub fn num_output_elements(&self) -> usize {
+        let mut elem = 1;
+        for dim in 0..self.ndim() {
+            if self.operands_[0].stride_bytes[dim] != 0 || self.shape_[dim] == 0 {
+                elem *= self.shape_[dim];
+            }
+        }
+        return elem;
+    }
+
+    pub fn num_reduce_dims(&self) -> usize {
+        let mut count = 0;
+        for dim in 0..self.ndim() {
+            if self.operands_[0].stride_bytes[dim] == 0 {
+                count += 1;
+            }
+        }
+        count
+    }
+
+    fn select_all_keeping_dim(&mut self, start_dim: usize, indices: &[usize]) -> () {
+        assert!(start_dim <= self.ndim());
+        for i in start_dim..self.ndim() {
+            for op in self.operands_.iter_mut() {
+                unsafe {
+                    op.data = Some(NonNull::new_unchecked(
+                        (op.data.unwrap().as_ptr() as *mut u8)
+                            .offset((op.stride_bytes[i] * indices[i - start_dim]) as isize)
+                            as *mut c_void,
+                    ));
+                }
+            }
+            self.shape_[i] = 1;
+        }
+    }
     fn reorder_dimensions(&mut self, _config: &TensorIteratorConfig) {
         let ndim = self.ndim();
         self.perm.resize(ndim, 0);
@@ -223,6 +289,7 @@ impl TensorIterator {
 
     pub fn build(config: &TensorIteratorConfig) -> Self {
         let mut self_ = Self::default();
+        self_.is_reduction_ = config.is_reduction_;
         self_.populate_operands(config);
         self_.mark_outputs();
         self_.compute_mem_overlaps(config);
@@ -239,7 +306,9 @@ impl TensorIterator {
         for op in &mut self_.operands_ {
             op.data = Some(op.tensor.data_ptr());
         }
-        // dbg!(&self_.operands_.len());
+
+        let ndim_offsets = if self_.ndim() > 0 { self_.ndim() } else { 1 };
+        self_.view_offsets = smallvec::smallvec![ndim_offsets;0];
         self_
     }
     fn compute_types(&mut self, config: &TensorIteratorConfig) {
@@ -351,8 +420,34 @@ impl TensorIterator {
                     )
                 );
             }
+            if common_device == KCPU {
+                if config.cast_common_dtype_to_outputs_
+                    && op.is_output
+                    && op.current_dtype != self.common_dtype_
+                {
+                    op.original_tensor = Some(op.tensor.clone());
+
+                    op.tensor = empty_like(
+                        &op.tensor,
+                        op.tensor.options().set_dtype_(self.common_dtype_),
+                        None,
+                    );
+                    op.current_dtype = self.common_dtype_;
+                }
+
+                // Promotes inputs by creating temporaries of the correct dtype
+                if config.promote_inputs_to_common_dtype_
+                    && !op.is_output
+                    && op.current_dtype != self.common_dtype_
+                {
+                    op.original_tensor = Some(op.tensor.clone());
+                    op.tensor = op.tensor.to_dtype(self.common_dtype_);
+                    op.current_dtype = self.common_dtype_;
+                }
+            }
         }
     }
+
     fn compatible_stride(&self, element_size: usize) -> StrideVector {
         let mut stride = StrideVector::new();
         let mut next_stride = element_size;
@@ -558,33 +653,36 @@ impl TensorIterator {
     fn compute_shape(&mut self, config: &TensorIteratorConfig) {
         if let Some(static_shape_) = config.static_shape_.as_ref() {
             self.shape_ = static_shape_.clone();
-        } else {
-            self.all_ops_same_shape_ = true;
-            let mut has_scalars = false;
-            let mut has_tensors = false;
-            for op in &(self.operands_) {
-                if config.resize_outputs_ && op.is_output {
-                    continue;
-                }
-                let shape = op.tensor.sizes();
-                if shape.len() == 0 {
-                    has_scalars = true;
-                } else {
-                    has_tensors = true;
-                }
-                if has_scalars && has_tensors {
-                    self.all_ops_same_shape_ = false;
-                }
-                if self.shape_.is_empty() {
-                    self.shape_.extend_from_slice(shape);
-                } else if shape != self.shape_.as_slice() {
-                    self.all_ops_same_shape_ = false;
-                    let tmp = super::tensor_util::infer_size(self.shape_.as_slice(), shape);
-                    self.shape_.copy_from_slice(tmp.as_slice());
-                }
-                // eprintln!("Iter Shape: {:?}", self.shape_);
-                // eprintln!("Oprands have same shape? {}", self.all_ops_same_shape_);
+            return;
+        }
+        self.all_ops_same_shape_ = true;
+        let mut has_scalars = false;
+        let mut has_tensors = false;
+        for op in self.operands_.iter() {
+            if !op.tensor.defined() {
+                continue;
             }
+            if config.resize_outputs_ && op.is_output {
+                continue;
+            }
+            let shape = op.tensor.sizes();
+            if shape.len() == 0 {
+                has_scalars = true;
+            } else {
+                has_tensors = true;
+            }
+            if has_scalars && has_tensors {
+                self.all_ops_same_shape_ = false;
+            }
+            if self.shape_.is_empty() {
+                self.shape_ = shape.into();
+            } else if shape != self.shape_.as_slice() {
+                self.all_ops_same_shape_ = false;
+                let tmp = super::tensor_util::infer_size(self.shape_.as_slice(), shape);
+                self.shape_.copy_from_slice(tmp.as_slice());
+            }
+            // eprintln!("Iter Shape: {:?}", self.shape_);
+            // eprintln!("Oprands have same shape? {}", self.all_ops_same_shape_);
         }
     }
 
@@ -677,13 +775,6 @@ impl TensorIterator {
         return true;
     }
 
-    fn ndim(&self) -> usize {
-        self.shape_.len()
-    }
-    pub fn numel(&self) -> usize {
-        self.shape_.iter().product()
-    }
-
     fn compute_fast_setup_type(&self, _config: &TensorIteratorConfig) -> FastSetupType {
         if self.is_reduction_ || !self.all_ops_same_shape_ {
             return FastSetupType::NONE;
@@ -735,6 +826,20 @@ impl TensorIterator {
             .enforce_safe_casting_to_output(true)
             .build()
     }
+    pub fn reduce_op(out: &Tensor, a: &Tensor) -> Self {
+        assert!(out.defined());
+        TensorIteratorConfig::default()
+            .add_output(out)
+            .add_input(a)
+            .resize_outputs(false)
+            .is_reduction(true)
+            // TODO: not supporting casting to outputs is only really necessary for arg{min,max}
+            .promote_inputs_to_common_dtype(true)
+            .build()
+    }
+
+    /// Pytorch uses this function with index to get output but
+    /// this function only gives first operand.
     pub fn output(&self) -> &Tensor {
         &self.operands_.first().unwrap().tensor
     }
@@ -777,17 +882,17 @@ impl TensorIterator {
         base: &smallvec::SmallVec<[NonNull<u8>; 4]>,
         counter: &[usize],
     ) -> smallvec::SmallVec<[NonNull<u8>; 4]> {
-        let mut ptrs = smallvec::SmallVec::new();
+        let mut ptrs = base.clone();
         for dim in 0..self.ndim() {
             let value = counter[dim];
             for arg in 0..self.ntensors() {
-                ptrs.insert(arg, unsafe {
+                ptrs[arg] = unsafe {
                     NonNull::new_unchecked(
-                        base[arg]
+                        ptrs[arg]
                             .as_ptr()
                             .add(value * self.operands_[arg].stride_bytes[dim]),
                     )
-                })
+                }
             }
         }
         ptrs
@@ -813,7 +918,7 @@ impl TensorIterator {
         }
     }
 
-    fn data_ptr(&self, arg: usize) -> NonNull<c_void> {
+    pub fn data_ptr(&self, arg: usize) -> NonNull<c_void> {
         self.operands_[arg].data.unwrap().clone()
     }
 
@@ -846,7 +951,7 @@ impl TensorIterator {
         let numel = self.numel();
         if numel == 0 {
             return;
-        } else if numel < 32768 {
+        } else if numel < aten::GRAIN_SIZE {
             let range = 0..numel;
             return self.serial_for_each_2d(loop_, range);
         }
@@ -902,8 +1007,71 @@ impl TensorIterator {
                 let ptrs = self.get_data_ptrs(&base_ptrs, counter.values.as_slice());
                 let step = counter.max_2d_step();
                 loop_(ptrs.as_slice(), strides.as_slice(), step[0], step[1]);
-                counter.increment(&step);
+                counter.increment(step);
             }
+        }
+    }
+
+    pub fn parallel_reduce(&self, loop_: LOOP2D) {
+        assert!(
+            self.ntensors() == 2,
+            "parallel_reduce only supports one input and one output"
+        );
+        let numel = self.numel();
+        if numel < aten::GRAIN_SIZE
+        /*|| at::get_num_threads() == 1 || at::in_parallel_region()*/
+        {
+            self.serial_for_each_2d(loop_, 0..numel);
+        } else if self.use_two_pass_reduction() {
+            self.two_pass_reduction(loop_);
+        } else {
+            self.parallel_dim_reduction(loop_);
+        }
+    }
+
+    #[inline(always)]
+    fn use_two_pass_reduction(&self) -> bool {
+        return self.output().numel() == 1;
+    }
+
+    fn two_pass_reduction(&self, _loop_: LOOP2D) {
+        todo!();
+    }
+
+    fn parallel_dim_reduction(&self, _loop_: LOOP2D) {
+        todo!()
+    }
+
+    pub fn foreach_reduced_elt<F>(&self, mut loop_: F, parallelize: bool)
+    where
+        F: FnMut(&Self),
+    {
+        assert_eq!(self.ninputs(), 1);
+        assert!(self.noutputs() >= 1);
+        let shape = &self.shape_;
+        let output_numel = self.output().numel();
+        if output_numel == 0 {
+            return;
+        }
+        if output_numel == 1 {
+            loop_(self);
+        } else if self.numel() < GRAIN_SIZE || !parallelize {
+            let reduce_dims = self.num_reduce_dims();
+            let non_reduced_shape = &shape[reduce_dims..]; //.slice(reduce_dims, shape.len() - reduce_dims);
+
+            let mut non_reduced_numel = 1;
+            for i in 0..non_reduced_shape.len() {
+                non_reduced_numel *= non_reduced_shape[i];
+            }
+            let mut dims = DimCounter::new(non_reduced_shape, 0..non_reduced_numel);
+            while !dims.is_done() {
+                let mut reduced = self.clone();
+                reduced.select_all_keeping_dim(reduce_dims, dims.values.as_slice());
+                loop_(&reduced);
+                dims.increment([1, 1]);
+            }
+        } else {
+            todo!();
         }
     }
 }
@@ -974,7 +1142,10 @@ impl TensorIteratorConfig {
         self.promote_inputs_to_common_dtype_ = promote_inputs_to_common_dtype;
         self
     }
-
+    pub fn is_reduction(&mut self, is_reduction: bool) -> &mut Self {
+        self.is_reduction_ = is_reduction;
+        self
+    }
     pub fn allow_cpu_scalars(&mut self, allow_cpu_scalars: bool) -> &mut Self {
         self.allow_cpu_scalars_ = allow_cpu_scalars;
         self

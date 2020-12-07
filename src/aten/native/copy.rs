@@ -12,7 +12,7 @@ fn copy_transpose_valid(self_: &Tensor, src: &Tensor) -> bool {
         && self_.scalar_type() == src.scalar_type()
         && self_.numel() >= MIN_SZ;
 }
-fn copy_same_type_transpose_(self_: &Tensor, src: &Tensor) {
+fn copy_same_type_transpose_(_self_: &Tensor, _src: &Tensor) {
     todo!()
 }
 

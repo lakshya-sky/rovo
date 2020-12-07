@@ -79,13 +79,14 @@ impl TensorOptions {
         clone
     }
 
-    pub fn set_dtype_mut<T: Into<Option<TypeMeta>>>(&mut self, dtype: T) {
+    pub fn set_dtype_mut<T: Into<Option<TypeMeta>>>(&mut self, dtype: T) -> &mut Self {
         if let Some(dtype) = dtype.into() {
             self.dtype = dtype;
             self.has_dtype = true;
         } else {
             self.has_dtype = false;
         }
+        self
     }
 
     pub fn set_device<T: Into<Option<Device>>>(&self, device: T) -> Self {
@@ -115,6 +116,19 @@ impl TensorOptions {
             self.has_layout = true;
         } else {
             self.has_layout = false;
+        }
+    }
+    pub fn set_memory_format(&self, memory_format: Option<MemoryFormat>) -> Self {
+        let mut r = self.clone();
+        r.set_memory_format_mut(memory_format);
+        return r;
+    }
+    pub fn set_memory_format_mut(&mut self, memory_format: Option<MemoryFormat>) {
+        if let Some(f) = memory_format {
+            self.has_memory_format = true;
+            self.memory_format = f
+        } else {
+            self.has_memory_format = false;
         }
     }
 
@@ -193,10 +207,24 @@ impl TensorOptions {
             None
         }
     }
-
+    pub fn layout(&self) -> Layout {
+        if self.has_layout {
+            self.layout
+        } else {
+            K_STRIDED
+        }
+    }
     pub fn dtype_opt(&self) -> Option<TypeMeta> {
         if self.has_dtype {
             Some(self.dtype)
+        } else {
+            None
+        }
+    }
+
+    pub fn memory_format_opt(&self) -> Option<MemoryFormat> {
+        if self.has_memory_format {
+            Some(self.memory_format)
         } else {
             None
         }

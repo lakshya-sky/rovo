@@ -208,6 +208,7 @@ pub struct TensorImpl {
     is_contiguous: bool,
     is_wrapped_number: bool,
     is_defined: bool,
+    is_non_overlapping_and_dense: bool,
 }
 impl Default for TensorImpl {
     fn default() -> Self {
@@ -224,6 +225,7 @@ impl Default for TensorImpl {
             is_contiguous: false,
             is_wrapped_number: false,
             is_defined: false,
+            is_non_overlapping_and_dense: false,
         }
     }
 }
@@ -248,6 +250,7 @@ impl TensorImpl {
             is_contiguous: true,
             is_wrapped_number: false,
             is_defined: true,
+            is_non_overlapping_and_dense: false,
         }
     }
 
@@ -385,6 +388,7 @@ impl TensorImpl {
     }
     fn refresh_contiguous(&mut self) {
         self.is_contiguous = self.compute_contiguous();
+        self.is_non_overlapping_and_dense = self.is_contiguous;
         // match dim(){
         //     4=>todo!(),
         //     5=>todo!(),
@@ -410,6 +414,7 @@ impl TensorImpl {
         dest_impl.data_type = src_impl.data_type;
         dest_impl.device_opt = src_impl.device_opt.clone();
         dest_impl.is_contiguous = src_impl.is_contiguous;
+        dest_impl.is_non_overlapping_and_dense = src_impl.is_non_overlapping_and_dense;
         dest_impl.is_wrapped_number = src_impl.is_wrapped_number;
         dest_impl.set_version_counter(version_counter.clone());
     }
@@ -505,6 +510,9 @@ impl TensorImpl {
     }
     pub fn is_contiguous_(&self, _memory_format: MemoryFormat) -> bool {
         self.is_contiguous
+    }
+    pub fn is_non_overlapping_and_dense(&self) -> bool {
+        return self.is_non_overlapping_and_dense;
     }
     pub fn layout(&self) -> Layout {
         // if is_sparse() {

@@ -5,7 +5,7 @@ use crate::{
     Closure, AT_DISPATCH_ALL_TYPES_AND, AT_PRIVATE_CASE_TYPE,
 };
 
-pub fn copy_kernel(_: DeviceType, iter: &mut TensorIterator, non_blocking: bool) {
+pub fn copy_kernel(_: DeviceType, iter: &mut TensorIterator, _non_blocking: bool) {
     let dtype = iter.dtype_(0);
 
     if dtype == iter.dtype_(1) {

@@ -48,28 +48,24 @@ pub fn sub(self_: &Tensor, other: &Tensor, _alpha: impl Into<Scalar>) -> Tensor 
 }
 
 /* --------------------------- Scalar ------------------------------- */
-pub fn add_scalar(
-    self_: &Tensor,
-    other: impl Into<Scalar>,
-    alpha: impl Into<Scalar>,
-) -> Tensor {
+pub fn add_scalar(self_: &Tensor, other: impl Into<Scalar>, alpha: impl Into<Scalar>) -> Tensor {
     add(self_, &wrapped_scalar_tensor(other.into()), alpha.into())
+}
+
+pub fn div_scalar(self_: &Tensor, other: impl Into<Scalar>) -> Tensor {
+    div(self_, &wrapped_scalar_tensor(other.into()))
 }
 
 pub fn mul_scalar(self_: &Tensor, other: impl Into<Scalar>) -> Tensor {
     mul(self_, &wrapped_scalar_tensor(other.into()))
 }
 
-pub fn sub_scalar(
-    self_: &Tensor,
-    other: impl Into<Scalar>,
-    alpha: impl Into<Scalar>,
-) -> Tensor {
+pub fn sub_scalar(self_: &Tensor, other: impl Into<Scalar>, alpha: impl Into<Scalar>) -> Tensor {
     sub(self_, &wrapped_scalar_tensor(other.into()), alpha.into())
 }
 
 #[inline(always)]
-fn wrapped_scalar_tensor(scalar: Scalar) -> Tensor {
+pub fn wrapped_scalar_tensor(scalar: Scalar) -> Tensor {
     let tensor = scalar_to_tensor(scalar, None);
     tensor.get_unsafe_tensor_impl().set_wrapped_number(true);
     tensor

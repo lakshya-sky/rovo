@@ -3,6 +3,8 @@ use crate::Closure;
 use std::convert::TryInto;
 use std::ptr::NonNull;
 
+// struct IsContiguous<N,SI,T,S>;
+
 pub fn cpu_serial_kernel<I: Copy, O: num::cast::NumCast, F, const N: usize>(
     iter: &mut TensorIterator,
     mut op: Closure<I, O, F, N>,
@@ -17,14 +19,147 @@ pub fn cpu_serial_kernel<I: Copy, O: num::cast::NumCast, F, const N: usize>(
     iter.serial_for_each(closure, range);
 }
 
+fn eval(
+    strides: &[usize],
+    n: usize,
+    stride_index: isize,
+    s: isize,
+    input_type_size: usize,
+    output_type_size: usize,
+) -> bool {
+    if n == 0 && stride_index == 0 {
+        strides[0] == output_type_size
+    } else if n == 0 && stride_index == -1 {
+        true
+    } else {
+        let first_bool =
+            strides[stride_index as usize] == if s == n as isize { 0 } else { input_type_size };
+        first_bool
+            && eval(
+                strides,
+                n - 1,
+                stride_index - 1,
+                s,
+                input_type_size,
+                output_type_size,
+            )
+    }
+}
+
+fn is_contiguous(
+    strides: &[usize],
+    arity: usize,
+    input_type_size: usize,
+    output_type_size: usize,
+) -> bool {
+    let n: usize = arity;
+
+    let stride_index = if output_type_size == 0 {
+        (arity - 1) as isize
+    } else {
+        arity as isize
+    };
+
+    let s = -1;
+
+    eval(
+        strides,
+        n,
+        stride_index,
+        s,
+        input_type_size,
+        output_type_size,
+    )
+}
+
+fn is_contiguous_scalar(
+    strides: &[usize],
+    s: usize,
+    arity: usize,
+    input_type_size: usize,
+    output_type_size: usize,
+) -> bool {
+    let n: usize = arity;
+    let stride_index = if output_type_size == 0 {
+        (arity - 1) as isize
+    } else {
+        arity as isize
+    };
+    eval(
+        strides,
+        n,
+        stride_index,
+        s as isize,
+        input_type_size,
+        output_type_size,
+    )
+}
+
+fn unroll_contiguous_scalar_checks(
+    strides: &[usize],
+    mut indices: std::ops::Range<usize>,
+    arity: usize,
+    input_type_size: usize,
+    output_type_size: usize,
+    mut cb: impl FnMut(usize),
+) {
+    if let Some(range_start) = indices.next() {
+        if is_contiguous_scalar(
+            strides,
+            range_start,
+            arity,
+            input_type_size,
+            output_type_size,
+        ) {
+            cb(range_start + 1);
+        } else {
+            unroll_contiguous_scalar_checks(
+                strides,
+                indices,
+                arity,
+                input_type_size,
+                output_type_size,
+                cb,
+            )
+        }
+    } else {
+        cb(0)
+    }
+}
+
 pub fn cpu_kernel_vec<I: Copy, O: num::cast::NumCast, F, const N: usize>(
     iter: &mut TensorIterator,
     mut op: Closure<I, O, F, N>,
 ) where
     F: FnMut([I; N]) -> O,
 {
-    let closure = move |data: &[NonNull<u8>], _strides: &[usize], n: usize| {
-        vectorized_loop(data, n, 0, &mut op);
+    let closure = move |data: &[NonNull<u8>], strides: &[usize], n: usize| {
+        if is_contiguous(
+            strides,
+            op.arity(),
+            op.input_type_size(),
+            op.output_type_size(),
+        ) {
+            vectorized_loop(data, n, 0, &mut op);
+        } else {
+            let arity = op.arity();
+            let indices = 0..arity;
+            let (in_size, out_size) = (op.input_type_size(), op.output_type_size());
+            unroll_contiguous_scalar_checks(
+                strides,
+                indices,
+                arity,
+                in_size,
+                out_size,
+                |idx: usize| {
+                    if idx != 0 {
+                        vectorized_loop(data, n, idx, &mut op)
+                    } else {
+                        basic_loop(data, strides, 0, n, &mut op)
+                    }
+                },
+            );
+        }
     };
     iter.for_each(closure);
 }

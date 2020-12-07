@@ -1,4 +1,5 @@
 use super::task::*;
+use crate::aten;
 use crate::core::AutoGradMode;
 use crate::ops::*;
 use crate::util;
@@ -44,7 +45,7 @@ impl Engine {
         }
     }
 
-    pub fn evaluate_outputs(edges: Option<&Vec<Edge>>, mut grads: VariableList) -> VariableList {
+    pub fn validate_outputs(edges: Option<&Vec<Edge>>, mut grads: VariableList) -> VariableList {
         if let Some(edges) = edges {
             if edges.len() != grads.len() {
                 panic!(format!(
@@ -71,7 +72,7 @@ impl Engine {
                     if !util::is_expandable_to(metadata.shape(), grad.sizes()) {
                         panic!(format!("invalid gradient at index {} - got {:?}, but expected shape comapatible with {:?}", i, grad.sizes(), metadata.shape()));
                     }
-                    new_grads.push(util::sum_to(grad, metadata.shape()))
+                    new_grads.push(aten::sum_to(grad, metadata.shape()))
                 } else {
                     new_grads.push(grad);
                 }
@@ -87,7 +88,7 @@ impl Engine {
         let inputs = InputBuffer::variables(inputs);
         let fn_ = unsafe { &mut *func };
         let outputs = fn_.call(inputs);
-        Self::evaluate_outputs(fn_.next_edges(), outputs)
+        Self::validate_outputs(fn_.next_edges(), outputs)
     }
 
     pub fn evaluate_function(

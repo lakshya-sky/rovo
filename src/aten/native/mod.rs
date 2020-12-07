@@ -28,11 +28,20 @@ pub use binary_ops::*;
 mod unary_ops;
 pub use unary_ops::*;
 
+mod shared_reduce_ops;
+pub use shared_reduce_ops::*;
+
+mod reduce_ops;
+pub use reduce_ops::*;
+
 mod tensor_shape;
 pub use tensor_shape::*;
 
 mod tensor_properties;
 pub use tensor_properties::*;
+
+mod tensor_conversions;
+pub use tensor_conversions::*;
 
 pub mod cpublas;
 // pub use cpu_blas::*;
@@ -57,7 +66,7 @@ pub fn update_result_type_state(tensor: &Tensor, in_state: ResultTypeState) -> R
     let mut current = tensor.scalar_type();
     if tensor.get_unsafe_tensor_impl().is_wrapped_number() {
         let current_default = type_meta_to_scalar_type(&get_default_dtype());
-        if is_floating_type(current) {
+        if isFloatingType(current) {
             current = current_default;
         }
     }
@@ -199,10 +208,10 @@ pub fn result_type(in_state: &ResultTypeState) -> ScalarType {
 fn combine_categories(higher: ScalarType, lower: ScalarType) -> ScalarType {
     if is_complex_type(higher) {
         return higher;
-    } else if !is_complex_type(lower) && is_floating_type(higher) {
+    } else if !is_complex_type(lower) && isFloatingType(higher) {
         return higher;
     }
-    if higher == ScalarType::Bool || is_floating_type(lower) || is_complex_type(lower) {
+    if higher == ScalarType::Bool || isFloatingType(lower) || is_complex_type(lower) {
         return promote_skip_undefined(higher, lower);
     }
     if higher != ScalarType::Undefined {

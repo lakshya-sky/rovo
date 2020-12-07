@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use once_cell::sync::OnceCell;
 #[derive(Debug, Copy, Clone, Default)]
 pub struct TypeMeta {

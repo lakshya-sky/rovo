@@ -74,7 +74,7 @@ pub fn is_qint_type(t: ScalarType) -> bool {
     t == ScalarType::QInt8 || t == ScalarType::QUInt8 || t == ScalarType::QInt32
 }
 #[inline(always)]
-pub fn is_floating_type(t: ScalarType) -> bool {
+pub fn isFloatingType(t: ScalarType) -> bool {
     t == ScalarType::Double
         || t == ScalarType::Float
         || t == ScalarType::Half
@@ -85,7 +85,7 @@ pub fn is_complex_type(t: ScalarType) -> bool {
     t == ScalarType::ComplexHalf || t == ScalarType::ComplexFloat || t == ScalarType::ComplexDouble
 }
 #[inline(always)]
-pub fn is_intgeral_type(t: ScalarType, included_bool: bool) -> bool {
+pub fn isIntegralType(t: ScalarType, included_bool: bool) -> bool {
     let is_integral = t == ScalarType::Byte
         || t == ScalarType::Char
         || t == ScalarType::Int
@@ -105,7 +105,7 @@ pub fn can_cast(from: ScalarType, to: ScalarType) -> bool {
         return false;
     }
     // We disallow float -> integral, e.g., int_tensor *= float is disallowed.
-    if is_floating_type(from) && is_intgeral_type(to, false) {
+    if isFloatingType(from) && isIntegralType(to, false) {
         return false;
     }
 
@@ -147,3 +147,20 @@ pub fn elementSize(t: ScalarType) -> usize {
         _ => todo!(),
     }
 }
+
+pub const kByte: ScalarType = ScalarType::Byte;
+pub const kChar: ScalarType = ScalarType::Char;
+pub const kShort: ScalarType = ScalarType::Short;
+pub const kInt: ScalarType = ScalarType::Int;
+pub const kLong: ScalarType = ScalarType::Long;
+pub const kHalf: ScalarType = ScalarType::Half;
+pub const kFloat: ScalarType = ScalarType::Float;
+pub const kDouble: ScalarType = ScalarType::Double;
+pub const kComplexHalf: ScalarType = ScalarType::ComplexHalf;
+pub const kComplexFloat: ScalarType = ScalarType::ComplexFloat;
+pub const kComplexDouble: ScalarType = ScalarType::ComplexDouble;
+pub const kBool: ScalarType = ScalarType::Bool;
+pub const kQInt8: ScalarType = ScalarType::QInt8;
+pub const kQUInt8: ScalarType = ScalarType::QUInt8;
+pub const kQInt32: ScalarType = ScalarType::QInt32;
+pub const kBFloat16: ScalarType = ScalarType::BFloat16;

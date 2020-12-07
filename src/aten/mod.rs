@@ -20,3 +20,6 @@ pub use expand_utils::*;
 
 mod functions;
 pub use functions::*;
+
+mod parallel;
+pub use parallel::*;

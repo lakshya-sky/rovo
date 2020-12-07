@@ -12,3 +12,9 @@ pub use binary_ops_kernel::*;
 
 mod copy_kernel;
 pub use copy_kernel::*;
+
+mod reduce_ops_kernel;
+pub use reduce_ops_kernel::*;
+
+mod sum_kernel;
+pub use sum_kernel::*;

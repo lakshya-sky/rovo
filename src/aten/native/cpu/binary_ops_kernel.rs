@@ -18,7 +18,7 @@ pub fn add_kernel(iter: &mut TensorIterator) {
 }
 
 pub fn div_kernel(iter: &mut TensorIterator) {
-    if is_intgeral_type(iter.dtype(), false) {
+    if isIntegralType(iter.dtype(), false) {
         todo!()
     } else {
         AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2!(iter.dtype(), "div_cpu", || {

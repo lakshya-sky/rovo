@@ -1,12 +1,15 @@
-use crate::aten::{
-    self,
-    native::{self, *},
-};
 use crate::autograd::SavedTensor;
 use crate::c10::Scalar;
 use crate::ops::*;
 use crate::tensor::*;
 use crate::util_autograd;
+use crate::{
+    aten::{
+        self,
+        native::{self, *},
+    },
+    c10::ScalarType,
+};
 use std::cell::RefCell;
 use std::ops::{Add, Div, Mul, Neg, Sub};
 use std::rc::Rc;
@@ -202,6 +205,45 @@ impl Div<Self> for Tensor {
     }
 }
 
+impl<S> Div<S> for &Tensor
+where
+    S: Into<Scalar>,
+{
+    type Output = Tensor;
+
+    fn div(self, rhs: S) -> Self::Output {
+        let rhs: Scalar = rhs.into();
+        let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
+        if util_autograd::compute_requires_grad(&[self]) {
+            let mut _grad_fn = DivBackwardScalar {
+                next_edges: None,
+                input_metadata_: smallvec::smallvec![],
+                _self: None,
+                other: rhs,
+            };
+            _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[self]));
+            _grad_fn._self = Some(SavedTensor::new(self, false));
+            grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
+        }
+        let result = div_scalar(self, rhs);
+        if grad_fn.is_some() {
+            util_autograd::set_history(&result, grad_fn.unwrap());
+        }
+        result
+    }
+}
+
+impl<S> Div<S> for Tensor
+where
+    S: Into<Scalar>,
+{
+    type Output = Self;
+
+    fn div(self, rhs: S) -> Self::Output {
+        &self / rhs
+    }
+}
+
 impl Neg for &Tensor {
     type Output = Tensor;
     fn neg(self) -> Self::Output {
@@ -326,7 +368,7 @@ pub fn addmm(
             alpha,
             beta,
         };
-        _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[mat1, mat2]));
+        _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[self_, mat1, mat2]));
         _grad_fn.mat1_ = Some(SavedTensor::new(mat1, false));
         _grad_fn.mat2_ = Some(SavedTensor::new(mat2, false));
         _grad_fn.mat2_sizes = mat2.sizes().to_vec();
@@ -339,45 +381,67 @@ pub fn addmm(
     result
 }
 
-pub fn mean(_self_: &Tensor) -> Tensor {
-    // let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
-    // if util_autograd::compute_requires_grad(&[self_]) {
-    //     let mut _grad_fn = MeanBackward {
-    //         next_edges: None,
-    //         input_metadata_: smallvec::smallvec![],
-    //         self_numel: self_.numel(),
-    //         self_sizes: self_.sizes().to_vec(),
-    //     };
-    //     _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[self_]));
-    //     grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
-    // }
-    // let result = super::linear_algebra::mean(self_);
-    // if grad_fn.is_some() {
-    //     util_autograd::set_history(&self_, grad_fn.unwrap());
-    // }
-    // result
-    todo!()
+pub fn mean(self_: &Tensor) -> Tensor {
+    let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
+    if util_autograd::compute_requires_grad(&[self_]) {
+        let mut _grad_fn = MeanBackward {
+            next_edges: None,
+            input_metadata_: smallvec::smallvec![],
+            self_numel: self_.numel(),
+            self_sizes: self_.sizes().to_vec(),
+            self_scalar_type: self_.scalar_type(),
+        };
+        _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[self_]));
+        grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
+    }
+    let result = aten::native::mean(self_, None);
+    if grad_fn.is_some() {
+        util_autograd::set_history(&self_, grad_fn.unwrap());
+    }
+    result
 }
 
-pub fn sum(_self_: &Tensor, _dims: Option<&[usize]>, _keep_dim: bool) -> Tensor {
-    // let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
-    // if util_autograd::compute_requires_grad(&[self_]) {
-    //     let mut _grad_fn = AddBackwardTensors {
-    //         next_edges: None,
-    //         input_metadata_: smallvec::smallvec![],
-    //     };
-    //     _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[self_]));
-    //     grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
-    // }
+pub fn sum(self_: &Tensor, dtype: Option<ScalarType>) -> Tensor {
+    let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
+    if util_autograd::compute_requires_grad(&[self_]) {
+        let mut _grad_fn = SumBackward0 {
+            next_edges: None,
+            input_metadata_: smallvec::smallvec![],
+            self_sizes: self_.sizes().to_vec(),
+        };
+        _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[self_]));
+        grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
+    }
 
-    // let result = super::linear_algebra::sum(self_, dims, keep_dim);
+    let result = aten::native::sum(self_, dtype);
 
-    // if grad_fn.is_some() {
-    //     util_autograd::set_history(&result, grad_fn.unwrap());
-    // }
+    if grad_fn.is_some() {
+        util_autograd::set_history(&result, grad_fn.unwrap());
+    }
 
-    // result
-    todo!()
+    result
+}
+pub fn sum_dim_int_list(self_: &Tensor, dim: &[usize], keep_dim: bool) -> Tensor {
+    let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
+    if util_autograd::compute_requires_grad(&[self_]) {
+        let mut _grad_fn = SumBackward1 {
+            next_edges: None,
+            input_metadata_: smallvec::smallvec![],
+            self_sizes: self_.sizes().to_vec(),
+            dim: dim.to_vec(),
+            keep_dim,
+        };
+        _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[self_]));
+        grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
+    }
+
+    let result = aten::native::sum_dim_int_list(self_, dim.to_vec(), keep_dim, None);
+
+    if grad_fn.is_some() {
+        util_autograd::set_history(&result, grad_fn.unwrap());
+    }
+
+    result
 }
 
 pub fn sigmoid(_tensor: &Tensor) -> Tensor {

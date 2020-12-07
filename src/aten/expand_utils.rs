@@ -43,3 +43,23 @@ pub fn infer_expand_geometry(
     }
     (expanded_sizes, expanded_strides)
 }
+pub fn sum_to(mut tensor: Tensor, shape: &[usize]) -> Tensor {
+    if shape.len() == 0 {
+        return tensor.sum();
+    }
+    let mut reduce_dims = smallvec::SmallVec::<[usize; 8]>::new();
+    let sizes = tensor.sizes();
+    let leading_dims = sizes.len() - shape.len();
+    for i in 0..leading_dims {
+        reduce_dims.push(i);
+    }
+    for i in leading_dims..sizes.len() {
+        if shape[i - leading_dims] == 1 && sizes[i] != 1 {
+            reduce_dims.push(i);
+        }
+    }
+    if !reduce_dims.is_empty() {
+        tensor = tensor.sum_dim(reduce_dims.as_slice(), true)
+    }
+    tensor
+}

@@ -1,4 +1,3 @@
-use crate::aten;
 use crate::tensor::{addmm, Tensor};
 
 pub fn linear(input: &Tensor, weight: &Tensor, bias: &Tensor) -> Tensor {

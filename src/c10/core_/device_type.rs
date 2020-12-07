@@ -32,6 +32,10 @@ impl Device {
     pub fn type_(&self) -> DeviceType {
         self.type_
     }
+
+    pub fn is_cpu(&self) -> bool {
+        self == DeviceType::CPU
+    }
 }
 
 impl From<&DeviceType> for Device {
@@ -46,9 +50,9 @@ impl From<DeviceType> for Device {
     }
 }
 
-impl PartialEq<DeviceType> for Device {
+impl PartialEq<DeviceType> for &Device {
     fn eq(&self, other: &DeviceType) -> bool {
         let other: Device = other.into();
-        self == &other
+        *self == &other
     }
 }

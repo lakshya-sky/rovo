@@ -65,9 +65,11 @@ impl Scalar {
             "f32" => FromPrimitive::from_f32(self.to_float()).unwrap(),
             "f64" => FromPrimitive::from_f64(self.to_double()).unwrap(),
             "i32" => FromPrimitive::from_i32(self.to_int()).unwrap(),
+            "i64" => FromPrimitive::from_i64(self.to_long()).unwrap(),
             _ => todo!(),
         }
     }
+
     #[inline(always)]
     fn to_int(&self) -> i32 {
         match self.v {
@@ -75,6 +77,15 @@ impl Scalar {
             V::f(val) => checked_convert(val, "int"),
         }
     }
+
+    #[inline(always)]
+    fn to_long(&self) -> i64 {
+        match self.v {
+            V::i(val) => checked_convert(val, "long"),
+            V::f(val) => checked_convert(val, "long"),
+        }
+    }
+
     #[inline(always)]
     fn to_float(&self) -> f32 {
         match self.v {
@@ -123,7 +134,19 @@ impl From<i32> for Scalar {
     }
 }
 
+impl From<usize> for Scalar {
+    fn from(v: usize) -> Self {
+        Self::new(v)
+    }
+}
+
 impl From<Scalar> for f32 {
+    fn from(s: Scalar) -> Self {
+        s.to()
+    }
+}
+
+impl From<Scalar> for usize {
     fn from(s: Scalar) -> Self {
         s.to()
     }
