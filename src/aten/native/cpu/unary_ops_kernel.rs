@@ -18,6 +18,20 @@ pub fn normal_kernel(self_: &Tensor, mean: f64, std: f64, mut gen: Option<Genera
     cpu::distribution_templates::normal_kernel(self_, mean, std, generator);
 }
 
+pub fn sigmoid_kernel(iter: &mut TensorIterator) {
+    AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2!(iter.dtype(), "sigmoid_cpu", || {
+        loops::cpu_kernel_vec(
+            iter,
+            Closure::new(|args: [SCALART; 1]| -> SCALART {
+                let a = args[0];
+                let exp_a: SCALART = f32::exp(-a as f32) as SCALART;
+                let one: SCALART = 1 as SCALART;
+                one / (one + exp_a)
+            }),
+        )
+    })
+}
+
 pub fn neg_kernel(iter: &mut TensorIterator) {
     AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2!(iter.dtype(), "neg_cpu", || {
         loops::cpu_kernel_vec(

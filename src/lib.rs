@@ -132,7 +132,8 @@ mod test {
 
     #[test]
     fn test_sigmoid_backward() {
-        let input = ones(&[2, 3], TensorOptions::with_requires_grad());
+        crate::init_rovo();
+        let input = full(&[2, 3], 3.0, TensorOptions::with_requires_grad());
         let result = sigmoid(&input);
         println!("Result: {:?}", result);
         backward(&vec![result], &vec![], false);
