@@ -446,18 +446,21 @@ pub fn sum_dim_int_list(self_: &Tensor, dim: &[usize], keep_dim: bool) -> Tensor
 
 pub fn sigmoid(tensor: &Tensor) -> Tensor {
     let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
+    // SigmoidBackWard requires same computation as forward pass,
+    // hence result is directly reused.
+    let result = aten::native::sigmoid(tensor);
+
     if util_autograd::compute_requires_grad(&[tensor]) {
         let mut _grad_fn = SigmoidBackward {
             next_edges: None,
             input_metadata_: smallvec::smallvec![],
-            result_: None,
+            result_: Some(SavedTensor::new(&result, false)),
         };
         _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[tensor]));
         grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
     }
-    let result = aten::native::sigmoid(tensor);
-    if grad_fn.is_some() {
-        util_autograd::set_history(&result, grad_fn.unwrap());
+    if let Some(fn_) = grad_fn {
+        util_autograd::set_history(&result, fn_);
     }
     result
 }

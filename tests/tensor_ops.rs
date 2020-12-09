@@ -37,6 +37,14 @@ fn test_div_scalar() {
 }
 
 #[test]
+fn test_add_scalar() {
+    rovo::init_rovo();
+    let x = autograd::full(&[2, 3], 3.0, TensorOptions::with_requires_grad());
+    let result = x + 2.0;
+    println!("test_add_scalar_result: {:?}", result);
+}
+
+#[test]
 fn test_t() {
     rovo::init_rovo();
     let t = autograd::full(&[2, 3], 1.0, TensorOptions::with_requires_grad());

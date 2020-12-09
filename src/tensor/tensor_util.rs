@@ -28,7 +28,7 @@ pub fn infer_size(a: &[usize], b: &[usize]) -> Vec<usize> {
     let dims_a = a.len();
     let dims_b = b.len();
     let n_dim = if dims_a > dims_b { dims_a } else { dims_b };
-    let mut expanded_sizes = Vec::<usize>::with_capacity(n_dim);
+    let mut expanded_sizes: Vec<usize> = (0..n_dim).into_iter().collect();
     // eprintln!("ndim: {}", n_dim);
     for i in (0..n_dim as isize).rev() {
         let offset = (n_dim as isize) - 1 - i;
@@ -44,7 +44,7 @@ pub fn infer_size(a: &[usize], b: &[usize]) -> Vec<usize> {
             i
         );
 
-        expanded_sizes.push(if size_a == 1 { size_b } else { size_a });
+        expanded_sizes[i as usize] = if size_a == 1 { size_b } else { size_a };
     }
     expanded_sizes
 }
