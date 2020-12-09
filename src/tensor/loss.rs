@@ -144,7 +144,6 @@ mod test {
         let result = super::binary_cross_entropy(&sigmoid(&input), &target, None, Reduction::Mean);
         println!("BCE Result: {:?}", result);
     }
-    git commit -m "BCE forward and backward pass are working and are consistent with pytorch."
 
     #[test]
     fn bce_loss_backward_test() {
