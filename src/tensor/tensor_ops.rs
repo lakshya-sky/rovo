@@ -14,6 +14,13 @@ use std::cell::RefCell;
 use std::ops::{Add, Div, Mul, Neg, Sub};
 use std::rc::Rc;
 
+#[inline(always)]
+fn check_no_requires_grad(tensor: &Tensor, name: &str) {
+    if tensor.defined() && tensor.requires_grad() {
+        panic!("the derivative for {} is not implemented", name);
+    }
+}
+
 impl Add<Self> for Tensor {
     type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
@@ -465,28 +472,54 @@ pub fn sigmoid(tensor: &Tensor) -> Tensor {
     result
 }
 
+pub fn squeeze(tensor: &Tensor) -> Tensor {
+    let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
+    // SigmoidBackWard requires same computation as forward pass,
+    // hence result is directly reused.
+    let result = aten::native::sigmoid(tensor);
+
+    if util_autograd::compute_requires_grad(&[tensor]) {
+        let mut _grad_fn = SigmoidBackward {
+            next_edges: None,
+            input_metadata_: smallvec::smallvec![],
+            result_: Some(SavedTensor::new(&result, false)),
+        };
+        _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[tensor]));
+        grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
+    }
+    if let Some(fn_) = grad_fn {
+        util_autograd::set_history(&result, fn_);
+    }
+    result
+}
+
 pub fn binary_cross_entropy(
-    _input: &Tensor,
-    _target: &Tensor,
-    _weight: Option<&Tensor>,
-    _reduction: super::loss::Reduction,
+    input: &Tensor,
+    target: &Tensor,
+    weight: Option<&Tensor>,
+    reduction: super::loss::Reduction,
 ) -> Tensor {
-    // let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
-    // if util_autograd::compute_requires_grad(&[input]) {
-    //     let mut _grad_fn = BinaryCrossEntropyBackward::default();
-    //     _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[input]));
-    //     _grad_fn.self_ = Some(SavedTensor::new(input, false));
-    //     _grad_fn.target_ = Some(SavedTensor::new(target, false));
-    //     if let Some(weight) = weight {
-    //         _grad_fn.weight_ = Some(SavedTensor::new(weight, false));
-    //     }
-    //     _grad_fn.reduction = reduction;
-    //     grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
-    // }
-    // let result = loss::binary_cross_entropy(input, target, weight, reduction);
-    // if grad_fn.is_some() {
-    //     util_autograd::set_history(&result, grad_fn.unwrap());
-    // }
-    // result
-    todo!()
+    check_no_requires_grad(target, "target");
+    if let Some(w) = weight {
+        check_no_requires_grad(w, "weight");
+    }
+    let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
+    if util_autograd::compute_requires_grad(&[input]) {
+        let mut _grad_fn = BinaryCrossEntropyBackward::default();
+        _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[input]));
+        _grad_fn.self_ = Some(SavedTensor::new(input, false));
+        _grad_fn.target_ = Some(SavedTensor::new(target, false));
+        if let Some(weight) = weight {
+            _grad_fn.weight_ = Some(SavedTensor::new(weight, false));
+        } else {
+            _grad_fn.weight_ = Some(SavedTensor::new_consume(Tensor::default(), false))
+        }
+        _grad_fn.reduction = reduction;
+        grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
+    }
+    let result = loss::binary_cross_entropy(input, target, weight, reduction);
+    if grad_fn.is_some() {
+        util_autograd::set_history(&result, grad_fn.unwrap());
+    }
+    result
 }

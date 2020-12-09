@@ -1,6 +1,9 @@
-use crate::c10::{Scalar, ScalarType};
 use crate::ops::NodeTrait;
 use crate::tensor::*;
+use crate::{
+    aten::native::sigmoid_backward,
+    c10::{Scalar, ScalarType},
+};
 use crate::{autograd::*, util::BitSet};
 use smallvec::*;
 
@@ -744,7 +747,7 @@ impl NodeTrait for SigmoidBackward {
     fn call(&mut self, input: Vec<Tensor>) -> Vec<Tensor> {
         let grad_input = input.first().unwrap();
         let result = self.result_.as_ref().unwrap().unpack();
-        let grad_result = (-&result + 1.0) * &result * grad_input;
+        let grad_result = sigmoid_backward(grad_input, &result);
         vec![grad_result]
     }
 
@@ -965,12 +968,12 @@ impl NodeTrait for BinaryCrossEntropyBackward {
         let grad_input = input.first().unwrap();
         let self_ = self.self_.as_ref().unwrap().unpack();
         let target_ = self.target_.as_ref().unwrap().unpack();
-        let weight = self.weight_.as_ref().and_then(|f| Some(f.unpack()));
+        let weight = self.weight_.as_ref().unwrap().unpack();
         let grad_result = loss::binary_cross_entropy_backward(
             grad_input,
             &self_,
             &target_,
-            weight.as_ref(),
+            &weight,
             self.reduction,
         );
         vec![grad_result]

@@ -1,4 +1,4 @@
-use crate::c10::{DataPtr, StorageImpl};
+use crate::c10::{DataPtr, MemoryFormat, StorageImpl};
 use crate::tensor::{Tensor, TensorImpl};
 
 pub fn resize<'a>(
@@ -65,4 +65,19 @@ pub fn resize_bytes(storage: &mut StorageImpl, size_bytes: usize) {
     } else {
         panic!("Trying to resize storage that is not resizable")
     }
+}
+
+pub fn resize_as_<'a>(
+    self_: &'a Tensor,
+    other: &Tensor,
+    optional_memory_format: Option<MemoryFormat>,
+) -> &'a Tensor {
+    let result = self_.resize(other.sizes(), None);
+    if let Some(mut m) = optional_memory_format {
+        if m == MemoryFormat::Preserve {
+            m = other.suggest_memory_format(false);
+        }
+        self_.get_unsafe_tensor_impl().empty_tensor_restride(m);
+    }
+    result
 }

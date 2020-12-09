@@ -113,6 +113,10 @@ impl Tensor {
     pub fn stride(&self, d: usize) -> usize {
         self.get_unsafe_tensor_impl().stride(d)
     }
+    pub fn resize_as_(&self, other: &Self) -> &Self {
+        native::resize_as_(self, other, None)
+    }
+
     pub fn resize(
         &self,
         size: &[usize],
@@ -322,9 +326,10 @@ impl Tensor {
     pub fn to_dtype(&self, dtype: ScalarType) -> Self {
         native::to_dtype(self, dtype, false, false, None)
     }
+
     /// Defaults:
     ///     channels_last_strides_exact_match: false
-    pub fn suggest_memory_format(&self, channels_last_strides_exact_match: bool) -> MemoryFormat {
+    pub fn suggest_memory_format(&self, _channels_last_strides_exact_match: bool) -> MemoryFormat {
         // Setting channels_last_strides_exact_match to true forces function to
         // check 0,1 - sized dimension strides.
         //   if !self.is_mkldnn() && !self.is_sparse() {

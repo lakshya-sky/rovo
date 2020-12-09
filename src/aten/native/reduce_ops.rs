@@ -6,7 +6,7 @@ use crate::{
     tensor::{maybe_wrap_dim, DimMask, DimVector, Tensor, TensorIterator},
 };
 
-use super::cpu::{mean_kernel_impl, sum_kernel_impl};
+use super::cpu::mean_kernel_impl;
 
 fn make_dim_mask(dims: &[usize], ndim: i64) -> DimMask {
     let mut mask = DimMask::default();

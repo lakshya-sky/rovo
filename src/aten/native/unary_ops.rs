@@ -62,6 +62,7 @@ pub fn neg_<'a>(self_: &'a Tensor) -> &'a Tensor {
 pub fn sigmoid_out<'a, 'b>(result: &'a Tensor, self_: &'b Tensor) -> &'a Tensor {
     unary_op_impl_out(result, self_, sigmoid_stub)
 }
+
 pub fn sigmoid(self_: &Tensor) -> Tensor {
     unary_op_impl(self_, sigmoid_out)
 }

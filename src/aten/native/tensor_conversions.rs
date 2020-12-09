@@ -51,7 +51,7 @@ pub fn to_dtype(
     dtype: ScalarType,
     non_blocking: bool,
     copy: bool,
-    optional_memory_format: Option<MemoryFormat>,
+    _optional_memory_format: Option<MemoryFormat>,
 ) -> Tensor {
     to_impl(
         self_,

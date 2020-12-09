@@ -126,7 +126,36 @@ fn unroll_contiguous_scalar_checks(
         cb(0)
     }
 }
-
+pub fn cpu_kernel<I: Copy, O: num::cast::NumCast, F, const N: usize>(
+    iter: &mut TensorIterator,
+    mut op: Closure<I, O, F, N>,
+) where
+    F: FnMut([I; N]) -> O,
+{
+    let closure = move |data: &[NonNull<u8>], strides: &[usize], n: usize| {
+        if is_contiguous(
+            strides,
+            op.arity(),
+            op.input_type_size(),
+            op.output_type_size(),
+        ) {
+            basic_loop(data, strides, 0, n, &mut op);
+        } else {
+            let arity = op.arity();
+            let indices = 0..arity;
+            let (in_size, out_size) = (op.input_type_size(), op.output_type_size());
+            unroll_contiguous_scalar_checks(
+                strides,
+                indices,
+                arity,
+                in_size,
+                out_size,
+                |_idx: usize| basic_loop(data, strides, 0, n, &mut op),
+            );
+        }
+    };
+    iter.for_each(closure);
+}
 pub fn cpu_kernel_vec<I: Copy, O: num::cast::NumCast, F, const N: usize>(
     iter: &mut TensorIterator,
     mut op: Closure<I, O, F, N>,

@@ -77,3 +77,36 @@ pub fn transpose_<'a>(self_: &'a Tensor, dim0: i64, dim1: i64) -> &'a Tensor {
     sizes.swap(dim0, dim1);
     self_.as_strided_(sizes.as_slice(), strides.as_slice())
 }
+
+fn infer_squeeze_geometry(tensor: &Tensor) -> (Vec<usize>, Vec<usize>) {
+    let mut sizes = vec![];
+    let mut strides = vec![];
+
+    for d in 0..tensor.dim() as usize {
+        if tensor.sizes()[d] != 1 {
+            sizes.push(tensor.size(d));
+            strides.push(tensor.stride(d));
+        }
+    }
+    (sizes, strides)
+}
+
+fn infer_squeeze_geometry_with_dim(tensor: &Tensor, dim: usize) -> (Vec<usize>, Vec<usize>) {
+    let mut sizes = vec![];
+    let mut strides = vec![];
+
+    for d in 0..tensor.dim() as usize {
+        if d != dim || tensor.sizes()[dim] != 1 {
+            sizes.push(tensor.size(d));
+            strides.push(tensor.stride(d));
+        }
+    }
+    (sizes, strides)
+}
+
+pub fn squeeze(self_: &Tensor) -> Tensor {
+    let g = infer_squeeze_geometry(self_);
+    let result;
+    result = self_.as_strided(g.0.as_slice(), g.1.as_slice());
+    result
+}

@@ -50,6 +50,14 @@ macro_rules! AT_DISPATCH_FLOATING_TYPES_AND2{
     }}
 }
 
+#[macro_export]
+macro_rules! AT_DISPATCH_FLOATING_TYPES{
+    ($TYPE: expr, $name: expr, $($args:expr),+)=>{{
+        AT_PRIVATE_CASE_TYPE!($TYPE, ScalarType::Float, f32, $($args)+);
+        AT_PRIVATE_CASE_TYPE!($TYPE, ScalarType::Double, f64, $($args)+);
+    }}
+}
+
 /*
 [&] {
     const auto& the_type = scalar_type;

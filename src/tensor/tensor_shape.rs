@@ -44,3 +44,4 @@ pub fn set_strided(self_: &Tensor, size: &[usize], stride: &[usize], storage_off
     self_.set_storage_offset(storage_offset);
     self_.set_sizes_and_strides(size, stride);
 }
+
