@@ -87,34 +87,3 @@ impl module::Module for Linear {
         }
     }
 }
-
-#[cfg(test)]
-mod test {
-    use super::Linear;
-    use crate::autograd;
-    use crate::autograd::backward;
-    use crate::c10::TensorOptions;
-    use crate::core::manual_seed;
-    use crate::nn::Module;
-
-    #[test]
-    fn linear_backward_test() {
-        crate::init_rovo();
-        manual_seed(0);
-        let linear = Linear::new(4, 3);
-        let x = autograd::full(&[2, 4], 3.0, TensorOptions::with_requires_grad());
-        let y = linear.forward(&[&x]);
-        // Expected: [[-2.0227153, 0.6529779, -0.6904765],[ -2.0227153, 0.6529779, -0.6904765]]
-        println!("Result: {:?}", y);
-        //Expected : -0.686738
-        println!("Mean: {:?}", y.mean());
-
-        backward::backward(&vec![y], &vec![], false);
-
-        //Expected : [
-        //           [-0.04011544, 0.08910112, -0.09542262, -0.011634579],
-        //           [-0.04011544, 0.08910112, -0.09542262, -0.011634579]
-        //          ]
-        println!("Input Grad: {:?}", x.grad());
-    }
-}
