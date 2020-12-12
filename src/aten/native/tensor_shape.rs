@@ -1,6 +1,11 @@
+use aten::{computeStride, infer_size};
+
 use super::make_tensor;
-use crate::aten;
-use crate::tensor::{maybe_wrap_dim, Tensor};
+use crate::{aten, tensor::TensorImpl};
+use crate::{
+    c10::Storage,
+    tensor::{maybe_wrap_dim, Tensor},
+};
 
 pub fn expand(self_: &Tensor, size: &[usize], _implicit: bool) -> Tensor {
     let (expandedSizes, expandedStrides) =
@@ -109,4 +114,38 @@ pub fn squeeze(self_: &Tensor) -> Tensor {
     let result;
     result = self_.as_strided(g.0.as_slice(), g.1.as_slice());
     result
+}
+
+fn alias_with_sizes_and_strides(self_: &Tensor, sizes: &[usize], strides: &[usize]) -> Tensor {
+    let new_self;
+    //   if self_.is_quantized(){
+    //     auto impl = c10::make_intrusive<QTensorImpl>(
+    //         Storage(self.storage()),
+    //         self.key_set(),
+    //         self.dtype(),
+    //         get_qtensorimpl(self)->quantizer());
+    //     impl->set_storage_offset(self.storage_offset());
+    //     impl->set_sizes_and_strides(sizes, strides);
+    //     self_ = Tensor(std::move(impl));
+    //   } else {
+    let mut impl_ = TensorImpl::new(self_.storage().clone(), self_.dtype().clone(), None);
+    impl_.set_storage_offset(self_.storage_offset());
+    impl_.set_sizes_and_strides(sizes, strides);
+    new_self = Tensor::from_impl(impl_);
+    //   }
+    return new_self;
+}
+
+pub fn view(self_: &Tensor, size: &[usize]) -> Tensor {
+    let inferred_size = infer_size(
+        size.iter()
+            .map(|i| *i as isize)
+            .collect::<Vec<isize>>()
+            .as_slice(),
+        self_.numel(),
+    );
+    let stride = computeStride(self_.sizes(), self_.strides(), inferred_size.as_slice());
+    assert!(stride.is_some(), "view size is not compatible with input tensor's size and stride (at least one dimension spans across two contiguous subspaces). Use .reshape(...) instead.");
+    let stride_value = stride.unwrap();
+    alias_with_sizes_and_strides(self_, inferred_size.as_slice(), stride_value.as_slice())
 }

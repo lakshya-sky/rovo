@@ -76,14 +76,14 @@ impl module::Module for Linear {
         F::linear(xs[0], self.ws.as_ref().unwrap(), self.bs.as_ref().unwrap())
     }
 
-    fn parameters(&self) -> Vec<Tensor> {
+    fn parameters(&self) -> Option<Vec<Tensor>> {
         if self.bs.is_some() {
-            vec![
+            Some(vec![
                 self.ws.as_ref().unwrap().clone(),
                 self.bs.as_ref().unwrap().clone(),
-            ]
+            ])
         } else {
-            vec![self.ws.as_ref().unwrap().clone()]
+            Some(vec![self.ws.as_ref().unwrap().clone()])
         }
     }
 }

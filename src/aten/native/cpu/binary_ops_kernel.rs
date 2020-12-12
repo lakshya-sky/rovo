@@ -4,14 +4,15 @@ use crate::Closure;
 use crate::{c10::*, AT_DISPATCH_FLOATING_TYPES};
 use crate::{AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2, AT_PRIVATE_CASE_TYPE};
 
-pub fn add_kernel(iter: &mut TensorIterator) {
+pub fn add_kernel(iter: &mut TensorIterator, alpha: Scalar) {
     if iter.dtype() == ScalarType::Bool {
         todo!()
     } else {
-        AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2!(iter.dtype(), "add_cpu", || {
+        AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2!(iter.dtype(), "add_cpu/sub_cpu", || {
+            let alpha: SCALART = alpha.to();
             loops::cpu_kernel_vec(
                 iter,
-                Closure::new(|args: [SCALART; 2]| -> SCALART { args[0] + args[1] }),
+                Closure::new(|args: [SCALART; 2]| -> SCALART { args[0] + alpha * args[1] }),
             )
         })
     }

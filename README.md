@@ -3,7 +3,6 @@
 ## Experimental Tensor Libary in Rust inspired from Pytorch.
 
 Last:
-- AddmmBackward maybe_multiply.
 
 - Handle case where iterator has no output. loops.rs:execute_op
 

@@ -2,7 +2,10 @@ use crate::c10::Scalar;
 use crate::tensor::{Tensor, TensorIterator};
 use crate::{aten::scalar_to_tensor, c10::DeviceType};
 
-use super::{cpu::sigmoid_backward_kernel, DispatchStub};
+use super::{
+    cpu::{add_kernel, sigmoid_backward_kernel},
+    DispatchStub,
+};
 
 #[inline(always)]
 fn binary_op_impl_out<'a>(
@@ -34,22 +37,36 @@ where
 //     out_impl(self_, self_)
 // }
 
-pub fn add_out<'a>(result: &'a Tensor, self_: &Tensor, other: &Tensor) -> &'a Tensor {
+/* ---------------------------- Stubs --------------------------*/
+struct add_stub;
+
+/* -------------------------- Stubs End ------------------------*/
+
+pub fn add_out<'a>(
+    result: &'a Tensor,
+    self_: &Tensor,
+    other: &Tensor,
+    alpha: Scalar,
+) -> &'a Tensor {
     let mut iter = TensorIterator::binary_op(result, self_, other, true);
-    super::cpu::add_kernel(&mut iter);
+    add_kernel(&mut iter, alpha);
     return result;
 }
-pub fn add(self_: &Tensor, other: &Tensor, _alpha: impl Into<Scalar>) -> Tensor {
+
+pub fn add(self_: &Tensor, other: &Tensor, alpha: impl Into<Scalar>) -> Tensor {
+    let alpha: Scalar = alpha.into();
     let result = Tensor::default();
     let mut iter = TensorIterator::binary_op(&result, self_, other, false);
-    super::cpu::add_kernel(&mut iter);
+    add_kernel(&mut iter, alpha);
     return result;
 }
+
 pub fn div_out<'a>(result: &'a Tensor, self_: &Tensor, other: &Tensor) -> &'a Tensor {
     let mut iter = TensorIterator::binary_op(result, self_, other, true);
     super::cpu::div_kernel(&mut iter);
     return result;
 }
+
 pub fn div(self_: &Tensor, other: &Tensor) -> Tensor {
     let result = Tensor::default();
     let mut iter = TensorIterator::binary_op(&result, self_, other, false);
@@ -67,6 +84,7 @@ pub fn mul(self_: &Tensor, other: &Tensor) -> Tensor {
     super::cpu::mul_kernel(&mut iter);
     return result;
 }
+
 pub fn sub_out<'a>(result: &'a Tensor, self_: &Tensor, other: &Tensor) -> &'a Tensor {
     let mut iter = TensorIterator::binary_op(result, self_, other, true);
     super::cpu::sub_kernel(&mut iter);

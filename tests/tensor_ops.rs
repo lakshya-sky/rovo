@@ -16,7 +16,7 @@ fn test_fill_and_add() {
     let r = autograd::empty(&[2, 2], None, None);
     t.fill_(1.0);
     r.fill_(1.23);
-    t.add_(&r, 0.0);
+    t.add_(&r);
     println!("{:?}", t);
 }
 

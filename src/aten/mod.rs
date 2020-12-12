@@ -15,6 +15,12 @@ pub use scalar_ops::*;
 mod cpu_type;
 pub use cpu_type::*;
 
+mod infer_size;
+pub use infer_size::*;
+
+mod tensor_utils;
+pub use tensor_utils::*;
+
 mod expand_utils;
 pub use expand_utils::*;
 

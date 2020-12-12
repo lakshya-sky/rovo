@@ -16,7 +16,7 @@ pub mod core;
 mod engine;
 pub mod nn;
 mod ops;
-mod optim;
+pub mod optim;
 pub mod tensor;
 mod util;
 mod util_autograd;

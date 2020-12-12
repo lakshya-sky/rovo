@@ -2,7 +2,7 @@ use crate::tensor::*;
 
 pub trait Module: std::fmt::Debug {
     fn forward(&self, xs: &[&Tensor]) -> Tensor;
-    fn parameters(&self) -> Vec<Tensor>;
+    fn parameters(&self) -> Option<Vec<Tensor>>;
 }
 
 pub trait ModuleT: std::fmt::Debug {

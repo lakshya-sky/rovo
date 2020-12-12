@@ -26,8 +26,8 @@ impl Module for Functional {
         (self.fn_)(xs)
     }
 
-    fn parameters(&self) -> Vec<Tensor> {
-        todo!()
+    fn parameters(&self) -> Option<Vec<Tensor>> {
+        None
     }
 }
 

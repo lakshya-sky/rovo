@@ -265,8 +265,17 @@ impl Tensor {
         super::tensor_ops::mm(self, other, consume)
     }
 
-    pub fn add_(&self, other: &Tensor, _scalar: f64) {
-        native::add_out(self, self, other);
+    pub fn add_(&self, other: &Tensor) {
+        self.add_with_alpha_(other, 1.0);
+    }
+
+    pub fn add_scalar(&self, other: impl Into<Scalar>) {
+        let other = wrapped_scalar_tensor(other.into());
+        self.add_(&other);
+    }
+
+    pub fn add_with_alpha_(&self, other: &Tensor, scalar: impl Into<Scalar>) {
+        native::add_out(self, self, other, scalar.into());
     }
 
     pub fn sum(&self) -> Self {
@@ -315,6 +324,10 @@ impl Tensor {
         self.div_(wrapped_scalar_tensor(other.into()));
     }
 
+    pub fn view(&self, shape: &[usize]) -> Self {
+        aten::native::view(self, shape)
+    }
+
     pub fn options(&self) -> TensorOptions {
         let options = TensorOptions::default();
         options
@@ -323,6 +336,7 @@ impl Tensor {
             .set_layout(self.layout());
         options
     }
+
     pub fn to_dtype(&self, dtype: ScalarType) -> Self {
         native::to_dtype(self, dtype, false, false, None)
     }
@@ -355,6 +369,7 @@ impl AsRef<Self> for Tensor {
         self
     }
 }
+
 impl AsRef<Self> for &Tensor {
     fn as_ref(&self) -> &Self {
         self
