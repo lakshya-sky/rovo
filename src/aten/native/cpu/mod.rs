@@ -18,3 +18,6 @@ pub use reduce_ops_kernel::*;
 
 mod sum_kernel;
 pub use sum_kernel::*;
+
+mod softmax_kernel;
+pub use softmax_kernel::*;

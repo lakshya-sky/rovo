@@ -1,3 +1,5 @@
+use aten::typedefault;
+
 use crate::autograd::SavedTensor;
 use crate::c10::Scalar;
 use crate::ops::*;
@@ -521,5 +523,29 @@ pub fn binary_cross_entropy(
     if grad_fn.is_some() {
         util_autograd::set_history(&result, grad_fn.unwrap());
     }
+    result
+}
+
+pub fn log_softmax(self_: &Tensor, dim: i64, dtype: Option<ScalarType>) -> Tensor {
+    let result = typedefault::log_softmax_int(self_, dim, dtype);
+    result
+}
+
+pub fn _log_softmax(self_: &Tensor, dim: i64, half_to_float: bool) -> Tensor {
+    let result = log_softmax_cpu(self_, dim, half_to_float);
+    let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
+    if util_autograd::compute_requires_grad(&[self_]) {
+        let mut _grad_fn = LogSoftmaxBackward::default();
+        _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[self_]));
+        _grad_fn.self_ = Some(SavedTensor::new(self_, false));
+        _grad_fn.result = Some(SavedTensor::new(&result, true));
+        _grad_fn.dim = dim;
+        grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
+    }
+
+    if grad_fn.is_some() {
+        util_autograd::set_history(&result, grad_fn.unwrap());
+    }
+    
     result
 }

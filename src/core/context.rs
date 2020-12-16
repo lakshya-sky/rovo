@@ -1,11 +1,13 @@
+use crate::c10::{DeviceType, KCPU};
+
 use super::*;
 struct Context;
 
 impl Context {
-    pub fn default_generator(&self, device: Device) -> &'static mut Generator {
+    pub fn default_generator(&self, device: DeviceType) -> &'static mut Generator {
         match device {
-            super::Device::CPU => get_default_cpu_generator(),
-            super::Device::CUDA => todo!(),
+            DeviceType::CPU => get_default_cpu_generator(),
+            _ => todo!(),
         }
     }
 }
@@ -23,7 +25,7 @@ fn global_context() -> &'static Context {
 
 pub fn manual_seed(seed: u64) {
     let context = global_context();
-    let gen = context.default_generator(Device::CPU);
+    let gen = context.default_generator(KCPU);
     gen.set_current_seed(seed);
 }
 

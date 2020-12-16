@@ -10,13 +10,16 @@
 extern crate openblas_src;
 
 pub mod aten;
-pub mod autograd;
 pub mod c10;
 pub mod core;
 mod engine;
 pub mod nn;
 mod ops;
 pub mod optim;
+
+mod rsrc;
+pub use rsrc::*;
+
 pub mod tensor;
 mod util;
 mod util_autograd;
@@ -69,7 +72,7 @@ pub fn init_rovo() {
 
 #[cfg(test)]
 mod test {
-    use super::autograd::*;
+    use crate::autograd::*;
     use super::c10::*;
     use super::tensor::*;
     #[test]

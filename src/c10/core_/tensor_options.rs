@@ -53,12 +53,14 @@ impl TensorOptions {
             ..Self::default()
         }
     }
-    pub fn with_dtype(dtype: TypeMeta) -> Self {
+    pub fn with_dtype(dtype: impl Into<TypeMeta>) -> Self {
+        let dtype: TypeMeta = dtype.into();
         Self {
             dtype,
             ..Self::default()
         }
     }
+
     pub fn with_memory_format(memory_format: MemoryFormat) -> Self {
         Self {
             memory_format,
@@ -87,6 +89,11 @@ impl TensorOptions {
             self.has_dtype = false;
         }
         self
+    }
+
+    pub fn set_dtype_mut_<T: Into<Option<ScalarType>>>(&mut self, scalar_type: T) -> &mut Self {
+        let dtype: Option<TypeMeta> = scalar_type.into().map_or(None, |s| Some(s.into()));
+        self.set_dtype_mut(dtype)
     }
 
     pub fn set_device<T: Into<Option<Device>>>(&self, device: T) -> Self {
@@ -131,7 +138,9 @@ impl TensorOptions {
             self.has_memory_format = false;
         }
     }
-
+    pub fn has_memory_format(&self) -> bool {
+        self.has_memory_format
+    }
     pub fn with_requires_grad() -> Self {
         Self::with_requires_grad_(true)
     }

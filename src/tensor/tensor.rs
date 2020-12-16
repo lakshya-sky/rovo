@@ -104,6 +104,11 @@ impl Tensor {
     pub fn dim(&self) -> i64 {
         self.get_unsafe_tensor_impl().dim()
     }
+
+    pub fn ndimension(&self) -> usize {
+        self.dim() as usize
+    }
+
     pub fn numel(&self) -> usize {
         self.get_unsafe_tensor_impl().numel()
     }
@@ -208,6 +213,10 @@ impl Tensor {
     }
     pub fn data_ptr(&self) -> NonNull<c_void> {
         self.get_unsafe_tensor_impl().data()
+    }
+
+    pub fn data_ptr_casted<T>(&self) -> *mut T {
+        self.get_unsafe_tensor_impl().data().as_ptr() as *mut T
     }
 
     pub fn scalar_type(&self) -> ScalarType {

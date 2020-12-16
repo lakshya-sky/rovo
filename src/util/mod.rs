@@ -1,10 +1,9 @@
 mod bitset;
 mod ordered_dict;
-mod vec256;
 
 pub use bitset::*;
 pub use ordered_dict::*;
-pub use vec256::*;
+pub mod vec256;
 
 pub fn is_expandable_to(shape: &[usize], desired: &[usize]) -> bool {
     let shape_dim = shape.len();

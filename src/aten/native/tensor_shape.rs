@@ -1,11 +1,8 @@
 use aten::{computeStride, infer_size};
 
 use super::make_tensor;
+use crate::tensor::{maybe_wrap_dim, Tensor};
 use crate::{aten, tensor::TensorImpl};
-use crate::{
-    c10::Storage,
-    tensor::{maybe_wrap_dim, Tensor},
-};
 
 pub fn expand(self_: &Tensor, size: &[usize], _implicit: bool) -> Tensor {
     let (expandedSizes, expandedStrides) =

@@ -1,7 +1,7 @@
-use crate::aten::native;
-use crate::autograd::AutogradMeta;
+use super::AutogradMeta;
 use crate::c10::{MemoryFormat, TensorOptions};
 use crate::tensor::{Edge, Tensor, TensorVersion};
+use crate::{aten::native, rsrc::TensorDataContainer};
 use std::rc::Rc;
 
 pub fn make_variable(data: Tensor, requires_grad: bool) -> Tensor {
@@ -94,11 +94,7 @@ pub fn ones_like<A: Into<Option<TensorOptions>>>(self_: &Tensor, options: A) -> 
     result
 }
 
-pub fn full<A: Into<Option<TensorOptions>>>(
-    size: &[usize],
-    fill_value: f32,
-    options: A,
-) -> Tensor {
+pub fn full<A: Into<Option<TensorOptions>>>(size: &[usize], fill_value: f32, options: A) -> Tensor {
     let options = get_options(options);
     let tensor =
         (|| -> Tensor { native::full(size, fill_value, options.set_requires_grad(None)) })();
@@ -116,5 +112,18 @@ pub fn full_like<A: Into<Option<TensorOptions>>>(
         native::full_like(self_, fill_value, options.set_requires_grad(None), None)
     })();
     let result = make_variable(tensor, options.requires_grad());
+    result
+}
+
+pub fn tensor<A: Into<Option<TensorOptions>>>(
+    tensor_data_container: impl Into<TensorDataContainer>,
+    options: A,
+) -> Tensor {
+    let options = get_options(options);
+    let tensor_data_container: TensorDataContainer = tensor_data_container.into();
+    let result = make_variable(
+        tensor_data_container.convert_to_tensor(options.set_requires_grad(None)),
+        options.requires_grad(),
+    );
     result
 }

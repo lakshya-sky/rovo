@@ -7,11 +7,6 @@ pub use generator::*;
 mod context;
 pub use context::*;
 
-pub enum Device {
-    CPU,
-    CUDA,
-}
-
 mod distribution_helper;
 pub use distribution_helper::*;
 

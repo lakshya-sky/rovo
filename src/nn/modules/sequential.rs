@@ -1,5 +1,3 @@
-use std::collections::VecDeque;
-
 use crate::{nn::Module, tensor::Tensor};
 #[derive(Debug)]
 pub struct Sequential {

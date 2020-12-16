@@ -1,8 +1,12 @@
-use crate::aten::native;
+use std::ptr::copy_nonoverlapping;
+
 use crate::aten::util::prod_intlist;
 use crate::c10::{MemoryFormat, Scalar, Storage, StorageImpl, TensorOptions, TypeMeta};
 use crate::core::get_cpu_allocator;
 use crate::tensor::{Tensor, TensorImpl};
+use crate::{
+    aten::native, c10::ScalarType, AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2, AT_PRIVATE_CASE_TYPE,
+};
 
 pub fn empty_cpu<T: Into<Option<MemoryFormat>>, A: AsRef<TensorOptions>>(
     size: &[usize],
@@ -135,6 +139,36 @@ pub fn scalar_tensor<A: AsRef<TensorOptions>>(s: Scalar, options: A) -> Tensor {
     let result = empty(&[], options, None);
     result.fill_(s);
     result
+}
+
+/* ~~~~~~~~~~~~~~~~~~~~~~~~~~~ Tensor from slice ~~~~~~~~~~~~~~~~~~~~~~~*/
+
+fn tensor_cpu<T, A: AsRef<TensorOptions>>(values: &[T], options: A) -> Tensor {
+    let result = empty(&[values.len()], options, None);
+    assert!(result.is_contiguous());
+    tensor_cpu_kernel(&result, values);
+    result
+}
+
+fn tensor_cpu_kernel<T>(result: &Tensor, values: &[T]) {
+    AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2!(result.scalar_type(), "tensor_cpu", || {
+        unsafe {
+            copy_nonoverlapping(
+                values.as_ptr() as *mut SCALART,
+                result.data_ptr().as_ptr() as *mut SCALART,
+                values.len(),
+            );
+        }
+    });
+}
+
+pub fn tensor<T, A: AsRef<TensorOptions>>(values: &[T], options: A) -> Tensor {
+    let options = options.as_ref();
+    if options.device().is_cpu() {
+        tensor_cpu(values, options)
+    } else {
+        todo!()
+    }
 }
 
 #[cfg(test)]

@@ -36,6 +36,10 @@ impl Device {
     pub fn is_cpu(&self) -> bool {
         self == DeviceType::CPU
     }
+    /// Returns true if the device has a non-default index.
+    pub fn has_index(&self) -> bool {
+        self.index != -1
+    }
 }
 
 impl From<&DeviceType> for Device {

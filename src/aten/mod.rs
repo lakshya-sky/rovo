@@ -29,3 +29,5 @@ pub use functions::*;
 
 mod parallel;
 pub use parallel::*;
+
+pub mod typedefault;

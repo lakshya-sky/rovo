@@ -49,6 +49,9 @@ pub mod cpublas;
 mod linear_algebra;
 pub use linear_algebra::*;
 
+mod softmax;
+pub use softmax::*;
+
 use crate::c10::*;
 use crate::tensor::Tensor;
 #[derive(Default, Clone)]

@@ -1,3 +1,5 @@
+use crate::c10::{DeviceType, KCPU};
+
 use super::mt19937_engine;
 use super::{Generator, GeneratorImpl};
 use std::ops::Shl;
@@ -41,8 +43,8 @@ impl CPUGeneratorImpl {
         random
     }
 
-    pub fn device_type(&self) -> super::super::Device {
-        super::super::Device::CPU
+    pub fn device_type(&self) -> DeviceType {
+        KCPU
     }
 
     pub fn random_(&self) -> u32 {

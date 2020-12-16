@@ -1070,3 +1070,70 @@ impl NodeTrait for MeanBackward {
         "MeanBackward".to_string()
     }
 }
+
+pub struct LogSoftmaxBackward {
+    pub input_metadata_: SmallVec<[InputMetaData; 2]>,
+    pub next_edges: Option<EdgeList>,
+    pub self_: Option<SavedTensor>,
+    pub result: Option<SavedTensor>,
+    pub dim: i64,
+}
+
+impl Default for LogSoftmaxBackward {
+    fn default() -> Self {
+        Self {
+            input_metadata_: smallvec![],
+            next_edges: None,
+            self_: None,
+            result: None,
+            dim: 0,
+        }
+    }
+}
+
+impl NodeTrait for LogSoftmaxBackward {
+    fn call(&mut self, input: Vec<Tensor>) -> Vec<Tensor> {
+        let grad_input = input.first().unwrap();
+        let self_ = self.self_.as_ref().unwrap().unpack();
+        let result = self.result.as_ref().unwrap().unpack();
+        let grad_result = _log_softmax_backward_data(grad_input, &result, self.dim, self_);
+        vec![grad_result]
+    }
+
+    fn set_next_edges(&mut self, edges: Vec<Edge>) {
+        self.next_edges = Some(edges)
+    }
+
+    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+        let input_nr = self.input_metadata_.len();
+        self.input_metadata_
+            .push(InputMetaData::from_tensor(tensor));
+        input_nr
+    }
+
+    fn next_edges(&self) -> Option<&EdgeList> {
+        self.next_edges.as_ref()
+    }
+
+    fn next_edge(&self, i: usize) -> Option<Edge> {
+        let edges = self.next_edges.as_ref().unwrap();
+        let e = edges.get(i).and_then(|e| Some(e.clone()));
+        e
+    }
+
+    fn num_inputs(&self) -> usize {
+        self.input_metadata_.len()
+    }
+
+    fn num_outputs(&self) -> usize {
+        self.next_edges.as_ref().unwrap().len()
+    }
+
+    fn input_metadata(&self, index: usize) -> &InputMetaData {
+        self.input_metadata_.get(index).unwrap()
+    }
+
+    fn debug_print(&self) -> String {
+        "LogSoftmaxBackward".to_string()
+    }
+}
