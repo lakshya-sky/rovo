@@ -20,6 +20,7 @@ pub enum FanModeType {
     FanIn,
     FanOut,
 }
+
 pub enum NonlinerityType {
     Linear,
     Conv1D,

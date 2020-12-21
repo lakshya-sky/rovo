@@ -1096,8 +1096,9 @@ impl NodeTrait for LogSoftmaxBackward {
         let grad_input = input.first().unwrap();
         let self_ = self.self_.as_ref().unwrap().unpack();
         let result = self.result.as_ref().unwrap().unpack();
-        let grad_result = _log_softmax_backward_data(grad_input, &result, self.dim, self_);
-        vec![grad_result]
+        // let grad_result = _log_softmax_backward_data(grad_input, &result, self.dim, self_);
+        // vec![grad_result]
+        todo!()
     }
 
     fn set_next_edges(&mut self, edges: Vec<Edge>) {

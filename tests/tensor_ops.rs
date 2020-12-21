@@ -1,5 +1,5 @@
-use rovo::autograd;
-use rovo::c10::TensorOptions;
+use rovo::{autograd, tensor::log_softmax};
+use rovo::{c10::TensorOptions, init_rovo};
 
 #[test]
 fn empty_tensor_and_fill_ones() {
@@ -87,4 +87,13 @@ fn test_blas() {
         )
     }
     dbg!(c);
+}
+
+#[test]
+fn logsoftmax() {
+    init_rovo();
+    let x = autograd::full(&[5, 5], 1.7, TensorOptions::with_requires_grad());
+    // let t = autograd::full(&[5, 1], 1.0, TensorOptions::with_requires_grad());
+    let result = log_softmax(&x, 1, None);
+    println!("Logsoftmax result: {:?}", result);
 }

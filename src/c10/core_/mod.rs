@@ -28,6 +28,9 @@ pub use scalar::*;
 mod tensor_options;
 pub use tensor_options::*;
 
+mod thread_pool;
+pub use thread_pool::*;
+
 pub fn allocator_init() {
     cpu_allocator::register_cpu_allocator();
 }

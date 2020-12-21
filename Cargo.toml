@@ -9,10 +9,12 @@ edition = "2018"
 [dependencies]
 libc = "0.2.79"
 blas-sys = "0.7.1"
-openblas-src = "0.9.0"
+blas-src = {version= "0.7.0", features = ["accelerate"]}
 num = "0.3"
 smallvec = "1.4.1"
 once_cell = "1.4.1"
+crossbeam = "0.8.0"
+rayon = "1.5.0"
 # bit-set = "0.5.2"
 
 [dev-dependencies]

@@ -1,5 +1,7 @@
+use std::sync::atomic::AtomicPtr;
+
 use crate::{
-    aten::GRAIN_SIZE,
+    aten::{parallel_for, GRAIN_SIZE},
     c10::ScalarType,
     tensor::Tensor,
     util::vec256::{self, Vec256},
@@ -20,18 +22,22 @@ fn _vec_log_softmax_lastdim<T: num::Float + PartialOrd, const CHUNK_SIZE: usize>
     if grain_size < CHUNK_SIZE {
         grain_size = CHUNK_SIZE;
     }
+    let mut input_data_base = AtomicPtr::new(input_data_base);
+    let mut output_data_base = AtomicPtr::new(output_data_base);
+
     let closure = |begin: usize, end: usize| {
         for ii in (begin..end).step_by(CHUNK_SIZE) {
-            let tmp_sum_scalar = [T::zero(); CHUNK_SIZE];
-            let max_input_arr = [T::zero(); CHUNK_SIZE];
-            let loop_end = CHUNK_SIZE;
+            let mut tmp_sum_scalar = [T::zero(); CHUNK_SIZE];
+            let mut max_input_arr = [T::zero(); CHUNK_SIZE];
+            let mut loop_end = CHUNK_SIZE;
             if ii + CHUNK_SIZE > end {
                 loop_end = end - ii;
             }
 
             for j in 0..loop_end {
                 let i = ii + j;
-                let input_data = unsafe { input_data_base.offset((i * dim_size) as isize) };
+                let input_data =
+                    unsafe { input_data_base.get_mut().offset((i * dim_size) as isize) };
                 max_input_arr[j] = vec256::reduce_all(
                     |x: Vec256<T>, y: Vec256<T>| -> Vec256<T> {
                         return Vec256::maximum(&x, &y);
@@ -42,7 +48,8 @@ fn _vec_log_softmax_lastdim<T: num::Float + PartialOrd, const CHUNK_SIZE: usize>
             }
             for j in 0..loop_end {
                 let i = ii + j;
-                let input_data = unsafe { input_data_base.offset((i * dim_size) as isize) };
+                let input_data =
+                    unsafe { input_data_base.get_mut().offset((i * dim_size) as isize) };
                 let max_input = max_input_arr[j];
                 tmp_sum_scalar[j] = vec256::map_reduce_all(
                     move |x: Vec256<T>| {
@@ -65,8 +72,10 @@ fn _vec_log_softmax_lastdim<T: num::Float + PartialOrd, const CHUNK_SIZE: usize>
             );
             for j in 0..loop_end {
                 let i = ii + j;
-                let input_data = unsafe { input_data_base.offset((i * dim_size) as isize) };
-                let output_data = unsafe { output_data_base.offset((i * dim_size) as isize) };
+                let input_data =
+                    unsafe { input_data_base.get_mut().offset((i * dim_size) as isize) };
+                let output_data =
+                    unsafe { output_data_base.get_mut().offset((i * dim_size) as isize) };
 
                 let tmp_sum = tmp_sum_scalar[j];
                 let max_input = max_input_arr[j];
@@ -87,11 +96,7 @@ fn _vec_log_softmax_lastdim<T: num::Float + PartialOrd, const CHUNK_SIZE: usize>
             }
         }
     };
-    //   parallel_for(
-    //       0,
-    //       outer_size,
-    //       grain_size,
-    // );
+    parallel_for(0, outer_size, grain_size, closure);
 }
 struct vec_host_softmax_lastdim;
 impl vec_host_softmax_lastdim {
@@ -101,7 +106,7 @@ impl vec_host_softmax_lastdim {
         input: &Tensor,
         log_softmax: bool,
     ) {
-        let outer_size = 1;
+        let mut outer_size = 1;
         let dim_size = input.size(input.ndimension() - 1);
         for i in 0..input.ndimension() - 1 {
             outer_size *= input.size(i);

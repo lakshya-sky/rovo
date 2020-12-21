@@ -1,4 +1,4 @@
-use num::traits::real::Real;
+use num::Float;
 use std::{
     ffi::c_void,
     iter::FromIterator,
@@ -13,14 +13,17 @@ use std::ops::Add;
 /// Since I can't find any other way to create that array at compile time.
 /// I am using const N for this.
 /// The contraint for that is N = 32/size_of(T)
-#[derive(Debug)]
-pub struct Vec256<T: num::Float> {
+#[derive(Debug, Clone)]
+pub struct Vec256<T: Float> {
     buf: [u8; 32],
     el_size: usize,
     _ph: PhantomData<T>,
 }
 
-impl<T: num::Float> Vec256<T> {
+impl<T> Vec256<T>
+where
+    T: Float + Sized,
+{
     pub fn new() -> Self {
         Self {
             buf: [0; 32],
@@ -34,7 +37,7 @@ impl<T: num::Float> Vec256<T> {
         v
     }
 
-    pub const fn size() -> usize {
+    pub fn size() -> usize {
         32 / std::mem::size_of::<T>()
     }
 
@@ -102,7 +105,7 @@ impl<T: num::Float> Vec256<T> {
     }
 }
 
-struct Vec256IntoIterator<T: num::Float> {
+pub struct Vec256IntoIterator<T: num::Float> {
     vec: Vec256<T>,
     index: usize,
 }
@@ -133,7 +136,7 @@ impl<T: num::Float> Iterator for Vec256IntoIterator<T> {
         }
     }
 }
-struct Vec256IntoIteratorRef<'a, T: num::Float> {
+pub struct Vec256IntoIteratorRef<'a, T: num::Float> {
     vec: &'a Vec256<T>,
     index: usize,
 }
@@ -225,29 +228,33 @@ impl<T: num::Float> Sub<Self> for Vec256<T> {
 
 // TODO: Make this more efficient
 #[inline(always)]
-pub unsafe fn vec_reduce_all<T: num::Float, F>(vec_fun: F, acc_vec: Vec256<T>, size: usize) -> T
+pub unsafe fn vec_reduce_all<T: num::Float, F>(
+    mut vec_fun: F,
+    mut acc_vec: Vec256<T>,
+    size: usize,
+) -> T
 where
     F: FnMut(Vec256<T>, Vec256<T>) -> Vec256<T>,
 {
-    let vec_size = Vec256::<T>::size();
+    let _vec_size = Vec256::<T>::size();
+    let el_size = acc_vec.el_size;
     let mut acc_arr = [0u8; 32];
     acc_vec.store(acc_arr.as_mut_ptr() as *mut c_void, None);
     for i in 1..size {
         let mut acc_arr_next = [0u8; 32];
-        unsafe {
-            let src = acc_arr.as_ptr().offset(i as isize) as *const T;
-            let dst = acc_arr_next.as_mut_ptr() as *mut T;
-            std::ptr::copy_nonoverlapping(src, dst, 1);
-            let acc_vec_next = Vec256::loadu(dst as *const c_void, None);
-            acc_vec = vec_fun(acc_vec, acc_vec_next);
-        };
+
+        let src = acc_arr.as_ptr().offset((i * el_size) as isize) as *const T;
+        let dst = acc_arr_next.as_mut_ptr() as *mut T;
+        std::ptr::copy_nonoverlapping(src, dst, 1);
+        let acc_vec_next = Vec256::loadu(dst as *const c_void, None);
+        acc_vec = vec_fun(acc_vec, acc_vec_next);
     }
     acc_vec.store(acc_arr.as_mut_ptr() as *mut c_void, None);
     return *(acc_arr.as_ptr() as *const T);
 }
 
 #[inline(always)]
-pub fn reduce_all<T: num::Float, F>(vec_fun: F, data: *mut T, size: usize) -> T
+pub fn reduce_all<T: num::Float, F>(mut vec_fun: F, data: *mut T, size: usize) -> T
 where
     F: FnMut(Vec256<T>, Vec256<T>) -> Vec256<T>,
 {
@@ -269,13 +276,19 @@ where
             unsafe { data.offset(d as isize) as *const c_void },
             size - d,
         );
-        acc_vec = Vec256::set(&acc_vec, &vec_fun(acc_vec, data_vec), size - d);
+        let tmp = &vec_fun(acc_vec.clone(), data_vec);
+        acc_vec = Vec256::set(&acc_vec, tmp, size - d);
     }
     unsafe { vec_reduce_all(vec_fun, acc_vec, vec_size) }
 }
 
 #[inline(always)]
-pub fn map_reduce_all<T: num::Float, M, R>(map_fun: M, red_fun: R, data: *mut T, size: usize) -> T
+pub fn map_reduce_all<T: num::Float, M, R>(
+    mut map_fun: M,
+    mut red_fun: R,
+    data: *mut T,
+    size: usize,
+) -> T
 where
     M: FnMut(Vec256<T>) -> Vec256<T>,
     R: FnMut(Vec256<T>, Vec256<T>) -> Vec256<T>,
@@ -291,27 +304,32 @@ where
         };
     }
     let mut d = vec_size;
-    let acc_vec = map_fun(Vec256::loadu(data as *const c_void, None));
+    let mut acc_vec = map_fun(Vec256::loadu(data as *const c_void, None));
     let limit = size - (size % vec_size);
     while d < limit {
-        let data_vec = Vec256::loadu(unsafe { data.offset(d as isize) as *const c_void }, None);
+        let mut data_vec = Vec256::loadu(unsafe { data.offset(d as isize) as *const c_void }, None);
         data_vec = map_fun(data_vec);
         acc_vec = red_fun(acc_vec, data_vec);
         d += vec_size;
     }
     if size - d > 0 {
-        let data_vec = Vec256::loadu(
+        let mut data_vec = Vec256::loadu(
             unsafe { data.offset(d as isize) as *const c_void },
             size - d,
         );
         data_vec = map_fun(data_vec);
-        acc_vec = Vec256::set(&acc_vec, &red_fun(acc_vec, data_vec), size - d);
+        acc_vec = Vec256::set(&acc_vec, &red_fun(acc_vec.clone(), data_vec), size - d);
     }
     return unsafe { vec_reduce_all(red_fun, acc_vec, vec_size) };
 }
 
 #[inline(always)]
-pub fn map<T: num::Float, M>(vec_fun: M, output_data: *mut T, input_data: *mut T, size: usize) -> ()
+pub fn map<T: num::Float, M>(
+    mut vec_fun: M,
+    output_data: *mut T,
+    input_data: *mut T,
+    size: usize,
+) -> ()
 where
     M: FnMut(Vec256<T>) -> Vec256<T>,
 {
@@ -344,7 +362,7 @@ where
 
 #[inline(always)]
 pub fn map2<T: num::Float, M>(
-    vec_fun: M,
+    mut vec_fun: M,
     output_data: *mut T,
     input_data: *mut T,
     input_data2: *mut T,

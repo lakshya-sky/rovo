@@ -7,7 +7,7 @@
 #![feature(min_const_generics, trace_macros, int_bits_const)]
 
 // trace_macros!(true);
-extern crate openblas_src;
+extern crate blas_src;
 
 pub mod aten;
 pub mod c10;
@@ -72,9 +72,9 @@ pub fn init_rovo() {
 
 #[cfg(test)]
 mod test {
-    use crate::autograd::*;
     use super::c10::*;
     use super::tensor::*;
+    use crate::autograd::*;
     #[test]
     fn test_backward_add() {
         crate::init_rovo();
