@@ -52,6 +52,7 @@ fn test_t() {
     assert_eq!(r.sizes(), &[3, 2]);
     println!("{:?}", r);
 }
+
 #[test]
 fn test_mm() {
     rovo::init_rovo();
@@ -63,6 +64,7 @@ fn test_mm() {
     println!("{:?}", x.grad().unwrap().as_ref());
     println!("{:?}", w.grad().unwrap().as_ref());
 }
+
 #[test]
 fn test_blas() {
     let (m, n, k) = (2, 1, 2);
