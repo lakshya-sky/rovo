@@ -51,6 +51,15 @@ Loss: Tensor: [1.02007] size: []
 Input Grad: Some(Tensor: [0.019757522, -0.058482096, 0.06944271, 0.027283773, 0.019757522, -0.058482096, 0.06944271, 0.027283773]       size: [2, 4])
 ```
 
+To-do:
+
+- [x] Empty tensor creation.
+- [x] Read Tensor by index and print Tensor.
+  - Index trait for [] enforces to return reference while we need value, hence I am using Get trait that has get() method.
+- [x] Make distributions consistent with Pytorch.
+- [x] Check for backprop and make it consistent with Pytorch.
+- [ ] Implement NLL Loss.
+
 Notes:
 
 - To run tests run `cargo test -- --test-threads=1`. This will make sure that tests are executing on single threads. Parellel tests are using shaered variables which will make some tests fail.
