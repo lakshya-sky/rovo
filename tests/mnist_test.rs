@@ -1,5 +1,18 @@
 use byteorder::{BigEndian, ReadBytesExt};
-use rovo::{autograd::tensor, core::manual_seed, init_rovo, tensor::Tensor};
+use rovo::{
+    aten::native::{full, scalar_tensor, wrapped_scalar_tensor},
+    autograd::{backward, tensor},
+    c10::TensorOptions,
+    core::manual_seed,
+    init_rovo,
+    nn::{Functional, Linear, Module, Sequential},
+    optim::{Optimizer, SGDOptions, SGD},
+    tensor::{
+        log_softmax,
+        loss::{binary_cross_entropy, Reduction},
+        Tensor,
+    },
+};
 use std::{
     fs::File,
     io::{Cursor, Read},
@@ -58,7 +71,7 @@ pub fn load_data(dataset_dir: &str, dataset_name: &str) -> Result<Vec<MnistImage
         let start = i * image_shape;
         let image_data = images_data.data[start..start + image_shape].to_vec();
         let image_data: Vec<f32> = image_data.into_iter().map(|x| x as f32 / 255.).collect();
-        images.push(tensor(image_data.as_slice(), None).view(&[1,784]));
+        images.push(tensor(image_data.as_slice(), None).view(&[1, 784]));
     }
 
     let classifications: Vec<u8> = label_data.data.clone();
@@ -74,11 +87,44 @@ pub fn load_data(dataset_dir: &str, dataset_name: &str) -> Result<Vec<MnistImage
 
     Ok(ret)
 }
-
 #[test]
 fn mnist_nn() {
     init_rovo();
     manual_seed(1);
-    let train_data = load_data("/home/darshan/Downloads", "train").unwrap();
-    println!("{:?}", train_data[0]);
+
+    let mut model = Sequential::new();
+
+    model.add(Linear::new(784, 64));
+    model.add(Functional::new(Functional::sigmoid()));
+    model.add(Linear::new(64, 10));
+    model.add(Functional::new(Functional::sigmoid()));
+
+    let mut sgd = SGD::new(model.parameters().unwrap(), SGDOptions::new(0.1));
+
+    let step = |optimizer: &mut SGD, model: &Sequential, inputs: Tensor, target: Tensor| {
+        // Note: Can't put the following line into closure beacuse
+        // zero_grad uses immutable reference and step uses mutable reference.
+        optimizer.zero_grad();
+        let closure = || {
+            let y = model.forward(&[&inputs]);
+            let y = log_softmax(&y, 1, None);
+            println!("LogSoftmax result: {:?}", y);
+            let loss = binary_cross_entropy(&y, &target, None, Reduction::Mean);
+            backward::backward(&vec![loss.clone()], &vec![], false);
+            loss
+        };
+        optimizer.step(Some(closure))
+    };
+
+    let train_data = load_data("/Users/darshankathiriya/Downloads", "train").unwrap();
+    for (index, data) in train_data.iter().enumerate() {
+        let image = &data.image;
+        let mut target = vec![0.0f32; 10];
+        target[data.classification as usize] = 1.0;
+        let target = tensor(target.as_slice(), None);
+        let result = step(&mut sgd, &model, image.clone(), target);
+        if index % 100 == 0 {
+            println!("Loss: {:?}", result);
+        }
+    }
 }

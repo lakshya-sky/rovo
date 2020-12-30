@@ -5,7 +5,7 @@ pub fn select(self_: &Tensor, dim: i64, mut index: i64) -> Tensor {
         panic!("Select can't be applied to a 0-dim index");
     }
     let dim = maybe_wrap_dim(dim, ndim, true);
-    let size = self_.size(dim);
+    let size = self_.size(dim as isize);
     if index < -(size as i64) || index >= (size as i64) {
         panic!();
     }
@@ -44,4 +44,3 @@ pub fn set_strided(self_: &Tensor, size: &[usize], stride: &[usize], storage_off
     self_.set_storage_offset(storage_offset);
     self_.set_sizes_and_strides(size, stride);
 }
-

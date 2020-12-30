@@ -52,6 +52,9 @@ pub use linear_algebra::*;
 mod softmax;
 pub use softmax::*;
 
+mod lossNLL;
+pub use lossNLL::*;
+
 use crate::c10::*;
 use crate::tensor::Tensor;
 #[derive(Default, Clone)]

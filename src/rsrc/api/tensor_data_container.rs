@@ -148,3 +148,9 @@ impl From<&[f32]> for TensorDataContainer {
         Self::from_slice(values, ScalarType::Float)
     }
 }
+
+impl<const N: usize> From<&[f32; N]> for TensorDataContainer {
+    fn from(values: &[f32; N]) -> Self {
+        Self::from_slice(&values[..], ScalarType::Float)
+    }
+}

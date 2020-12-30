@@ -441,7 +441,7 @@ impl TensorImpl {
         }
         is_contiguous
     }
-    pub fn size(&self, d: usize) -> usize {
+    pub fn size(&self, d: isize) -> usize {
         let d = maybe_wrap_dim(d as i64, self.dim(), false);
         self.sizes[d]
     }

@@ -86,7 +86,7 @@ fn infer_squeeze_geometry(tensor: &Tensor) -> (Vec<usize>, Vec<usize>) {
 
     for d in 0..tensor.dim() as usize {
         if tensor.sizes()[d] != 1 {
-            sizes.push(tensor.size(d));
+            sizes.push(tensor.size(d as isize));
             strides.push(tensor.stride(d));
         }
     }
@@ -99,7 +99,7 @@ fn infer_squeeze_geometry_with_dim(tensor: &Tensor, dim: usize) -> (Vec<usize>, 
 
     for d in 0..tensor.dim() as usize {
         if d != dim || tensor.sizes()[dim] != 1 {
-            sizes.push(tensor.size(d));
+            sizes.push(tensor.size(d as isize));
             strides.push(tensor.stride(d));
         }
     }

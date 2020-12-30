@@ -107,9 +107,9 @@ impl vec_host_softmax_lastdim {
         log_softmax: bool,
     ) {
         let mut outer_size = 1;
-        let dim_size = input.size(input.ndimension() - 1);
+        let dim_size = input.size((input.ndimension() - 1) as isize);
         for i in 0..input.ndimension() - 1 {
-            outer_size *= input.size(i);
+            outer_size *= input.size(i as isize);
         }
 
         let input_data_base = input.data_ptr_casted::<SCALART>();

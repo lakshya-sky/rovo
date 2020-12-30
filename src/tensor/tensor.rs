@@ -112,7 +112,7 @@ impl Tensor {
     pub fn numel(&self) -> usize {
         self.get_unsafe_tensor_impl().numel()
     }
-    pub fn size(&self, d: usize) -> usize {
+    pub fn size(&self, d: isize) -> usize {
         self.get_unsafe_tensor_impl().size(d)
     }
     pub fn stride(&self, d: usize) -> usize {
@@ -217,6 +217,10 @@ impl Tensor {
 
     pub fn data_ptr_casted<T>(&self) -> *mut T {
         self.get_unsafe_tensor_impl().data().as_ptr() as *mut T
+    }
+
+    pub fn accessor<T, const N: usize>(&self) -> TensorAccessor<T, N> {
+        TensorAccessor::<T, N>::new(self.data_ptr_casted::<T>(), self.sizes(), self.strides())
     }
 
     pub fn scalar_type(&self) -> ScalarType {

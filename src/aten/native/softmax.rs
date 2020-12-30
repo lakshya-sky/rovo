@@ -13,13 +13,13 @@ use super::{cpu::log_softmax_lastdim_kernel_impl, empty_like};
 
 fn host_softmax<T: Float + Send>(output: &Tensor, input: &Tensor, dim: usize, log_softmax: bool) {
     let mut outer_size = 1;
-    let dim_size = input.size(dim);
+    let dim_size = input.size(dim as isize);
     let mut inner_size = 1;
     for i in 0..dim {
-        outer_size *= input.size(i);
+        outer_size *= input.size(i as isize);
     }
     for i in dim + 1..(input.dim() as usize) {
-        inner_size *= input.size(i);
+        inner_size *= input.size(i as isize);
     }
     let dim_stride = inner_size;
     let outer_stride = dim_size * dim_stride;
