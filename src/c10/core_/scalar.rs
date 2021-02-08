@@ -9,14 +9,14 @@ enum Tag {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 enum V {
     i(i64),
     f(f64),
 }
 
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct Scalar {
     v: V,
 }
@@ -116,38 +116,62 @@ impl Scalar {
     }
 }
 
-impl From<f32> for Scalar {
-    fn from(v: f32) -> Self {
-        Self::new(v)
-    }
-}
+// impl From<f32> for Scalar {
+//     fn from(v: f32) -> Self {
+//         Self::new(v)
+//     }
+// }
 
-impl From<f64> for Scalar {
-    fn from(v: f64) -> Self {
-        Self::new(v)
-    }
-}
+// impl From<f64> for Scalar {
+//     fn from(v: f64) -> Self {
+//         Self::new(v)
+//     }
+// }
 
-impl From<i32> for Scalar {
-    fn from(v: i32) -> Self {
-        Self::new(v)
-    }
-}
+// impl From<i32> for Scalar {
+//     fn from(v: i32) -> Self {
+//         Self::new(v)
+//     }
+// }
 
-impl From<usize> for Scalar {
-    fn from(v: usize) -> Self {
-        Self::new(v)
-    }
-}
+// impl From<usize> for Scalar {
+//     fn from(v: usize) -> Self {
+//         Self::new(v)
+//     }
+// }
 
-impl From<Scalar> for f32 {
-    fn from(s: Scalar) -> Self {
-        s.to()
-    }
-}
+// impl From<Scalar> for f32 {
+//     fn from(s: Scalar) -> Self {
+//         s.to()
+//     }
+// }
 
-impl From<Scalar> for usize {
-    fn from(s: Scalar) -> Self {
-        s.to()
-    }
+// impl From<Scalar> for usize {
+//     fn from(s: Scalar) -> Self {
+//         s.to()
+//     }
+// }
+macro_rules! impl_scalar {
+    ($($t:ty),*) => {
+        $(
+            impl From<$t> for Scalar{
+                fn from(s: $t) -> Self {
+                    Self::new(s)
+                }
+            }
+        )*
+    };
 }
+macro_rules! impl_from_scalar {
+    ($($t:ty)*) => {
+        $(
+            impl From<Scalar> for $t{
+                fn from(s: Scalar) -> Self {
+                    s.to()
+                }
+            }
+        )*
+    };
+}
+impl_scalar!(f32, f64, i32, i64, usize, isize);
+impl_from_scalar! {f32 f64 i32 i64 usize isize}

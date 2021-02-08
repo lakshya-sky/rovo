@@ -1,5 +1,3 @@
-use crate::c10::ScalarType;
-
 #[macro_export]
 macro_rules! AT_PRIVATE_CASE_TYPE{
     ($_ident: expr, $enum_type: path, $type: ty, $($args:expr),+)=>{
@@ -12,7 +10,7 @@ macro_rules! AT_PRIVATE_CASE_TYPE{
 
 #[macro_export]
 macro_rules! AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2 {
-    ($TYPE: expr, $name: expr, $($args:expr),+) => {{
+    (_, _, $TYPE: expr, $name: expr, $($args:expr),+) => {{
         // match $TYPE {
         //     ScalarType::Int => {
         //         type SCALART = i32;
@@ -20,9 +18,10 @@ macro_rules! AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2 {
         //     },
         //     _ => todo!()
         // };
-        AT_PRIVATE_CASE_TYPE!($TYPE, ScalarType::Float, f32, $($args)+);
-        AT_PRIVATE_CASE_TYPE!($TYPE, ScalarType::Int, i32, $($args)+);
-        AT_PRIVATE_CASE_TYPE!($TYPE, ScalarType::Double, f64, $($args)+);
+        $crate::AT_PRIVATE_CASE_TYPE!($TYPE, $crate::c10::ScalarType::Float, f32, $($args)+);
+        $crate::AT_PRIVATE_CASE_TYPE!($TYPE, $crate::c10::ScalarType::Int, i32, $($args)+);
+        $crate::AT_PRIVATE_CASE_TYPE!($TYPE, $crate::c10::ScalarType::Double, f64, $($args)+);
+        $crate::AT_PRIVATE_CASE_TYPE!($TYPE, $crate::c10::ScalarType::Long, i64, $($args)+);
     }};
 }
 
@@ -36,25 +35,26 @@ macro_rules! AT_DISPATCH_ALL_TYPES_AND {
         //     },
         //     _ => todo!()
         // };
-        AT_PRIVATE_CASE_TYPE!($TYPE, ScalarType::Float, f32, $($args)+);
-        AT_PRIVATE_CASE_TYPE!($TYPE, ScalarType::Int, i32, $($args)+);
-        AT_PRIVATE_CASE_TYPE!($TYPE, ScalarType::Double, f64, $($args)+);
+        $crate::AT_PRIVATE_CASE_TYPE!($TYPE, $crate::c10::ScalarType::Float, f32, $($args)+);
+        $crate::AT_PRIVATE_CASE_TYPE!($TYPE, $crate::c10::ScalarType::Int, i32, $($args)+);
+        $crate::AT_PRIVATE_CASE_TYPE!($TYPE, $crate::c10::ScalarType::Double, f64, $($args)+);
+        $crate::AT_PRIVATE_CASE_TYPE!($TYPE, $crate::c10::ScalarType::Long, i64, $($args)+);
     }};
 }
 
 #[macro_export]
 macro_rules! AT_DISPATCH_FLOATING_TYPES_AND2{
     ($TYPE: expr, $name: expr, $($args:expr),+)=>{{
-        AT_PRIVATE_CASE_TYPE!($TYPE, ScalarType::Float, f32, $($args)+);
-        AT_PRIVATE_CASE_TYPE!($TYPE, ScalarType::Double, f64, $($args)+);
+        $crate::AT_PRIVATE_CASE_TYPE!($TYPE, $crate::c10::ScalarType::Float, f32, $($args)+);
+        $crate::AT_PRIVATE_CASE_TYPE!($TYPE, $crate::c10::ScalarType::Double, f64, $($args)+);
     }}
 }
 
 #[macro_export]
 macro_rules! AT_DISPATCH_FLOATING_TYPES{
     ($TYPE: expr, $name: expr, $($args:expr),+)=>{{
-        AT_PRIVATE_CASE_TYPE!($TYPE, ScalarType::Float, f32, $($args)+);
-        AT_PRIVATE_CASE_TYPE!($TYPE, ScalarType::Double, f64, $($args)+);
+        $crate::AT_PRIVATE_CASE_TYPE!($TYPE, $crate::c10::ScalarType::Float, f32, $($args)+);
+        $crate::AT_PRIVATE_CASE_TYPE!($TYPE, $crate::c10::ScalarType::Double, f64, $($args)+);
     }}
 }
 

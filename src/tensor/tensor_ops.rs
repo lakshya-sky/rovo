@@ -1,4 +1,6 @@
 use aten::typedefault;
+use loss::Reduction;
+use util_autograd::{collect_next_edges, compute_requires_grad, set_history};
 
 use crate::autograd::SavedTensor;
 use crate::c10::Scalar;
@@ -546,6 +548,33 @@ pub fn _log_softmax(self_: &Tensor, dim: i64, half_to_float: bool) -> Tensor {
     if grad_fn.is_some() {
         util_autograd::set_history(&result, grad_fn.unwrap());
     }
-    
     result
+}
+pub fn nll_loss_forward(
+    self_: &Tensor,
+    target: &Tensor,
+    weight: Option<&Tensor>,
+    reduction: Reduction,
+    ignore_index: i64,
+) -> (Tensor, Tensor) {
+    let (output, total_weight) =
+        native::nll_loss_forward_cpu(self_, target, weight, reduction, ignore_index);
+    let any_requires_grad = compute_requires_grad(&[self_]);
+    if let Some(w) = weight {
+        check_no_requires_grad(w, "weight");
+    }
+    let mut grad_fn: Option<Rc<RefCell<Node>>> = None;
+    if any_requires_grad {
+        let mut _grad_fn = NllLossBackward::default();
+        _grad_fn.set_next_edges(collect_next_edges(&[self_]));
+        _grad_fn.self_ = Some(SavedTensor::new(self_, false));
+        _grad_fn.target = Some(SavedTensor::new(target, false));
+        _grad_fn.weight = Some(SavedTensor::new_with_optional(weight, false));
+        _grad_fn.total_weight = Some(SavedTensor::new(&total_weight, true));
+        grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
+    }
+    if grad_fn.is_some() {
+        set_history(&output, grad_fn.unwrap());
+    }
+    (output, total_weight)
 }

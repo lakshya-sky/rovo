@@ -4,9 +4,7 @@ use crate::aten::util::prod_intlist;
 use crate::c10::{MemoryFormat, Scalar, Storage, StorageImpl, TensorOptions, TypeMeta};
 use crate::core::get_cpu_allocator;
 use crate::tensor::{Tensor, TensorImpl};
-use crate::{
-    aten::native, c10::ScalarType, AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2, AT_PRIVATE_CASE_TYPE,
-};
+use crate::{aten::native, AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2};
 
 pub fn empty_cpu<T: Into<Option<MemoryFormat>>, A: AsRef<TensorOptions>>(
     size: &[usize],
@@ -28,9 +26,9 @@ pub fn empty_cpu<T: Into<Option<MemoryFormat>>, A: AsRef<TensorOptions>>(
     if size.len() != 1 || size[0] != 0 {
         tensor.get_unsafe_tensor_impl().set_sizes_contiguous(size);
     }
-
     tensor
 }
+
 pub fn empty_strided_cpu<A: AsRef<TensorOptions>>(
     size: &[usize],
     stride: &[usize],
@@ -151,11 +149,11 @@ fn tensor_cpu<T, A: AsRef<TensorOptions>>(values: &[T], options: A) -> Tensor {
 }
 
 fn tensor_cpu_kernel<T>(result: &Tensor, values: &[T]) {
-    AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2!(result.scalar_type(), "tensor_cpu", || {
+    AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2!(_, _, result.scalar_type(), "tensor_cpu", || {
         unsafe {
             copy_nonoverlapping(
                 values.as_ptr() as *mut SCALART,
-                result.data_ptr().as_ptr() as *mut SCALART,
+                result.data_ptr_casted::<SCALART>(),
                 values.len(),
             );
         }

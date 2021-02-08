@@ -31,6 +31,7 @@ fn compute_desired_dtype(scalar_type: ScalarType) -> ScalarType {
         return scalar_type;
     }
 }
+#[derive(Debug)]
 pub struct TensorDataContainer {
     type_: TensorDataContainerType,
     sizes: Vec<usize>,
@@ -86,7 +87,7 @@ impl TensorDataContainer {
             tensor = aten::native::tensor(values, {
                 let device: Device = KCPU.into();
                 TensorOptions::with_dtype(scalar_type).set_device(device)
-            })
+            });
         }
         Self {
             sizes: vec![values.len()],
@@ -137,20 +138,45 @@ impl TensorDataContainer {
       */
 }
 
-impl From<f32> for TensorDataContainer {
-    fn from(val: f32) -> Self {
-        TensorDataContainer::from_scalar(val.into(), ScalarType::Float)
-    }
+// impl From<f32> for TensorDataContainer {
+//     fn from(val: f32) -> Self {
+//         TensorDataContainer::from_scalar(val.into(), ScalarType::Float)
+//     }
+// }
+
+// impl From<&[f32]> for TensorDataContainer {
+//     fn from(values: &[f32]) -> Self {
+//         Self::from_slice(values, ScalarType::Float)
+//     }
+// }
+
+// impl<const N: usize> From<&[f32; N]> for TensorDataContainer {
+//     fn from(values: &[f32; N]) -> Self {
+//         Self::from_slice(&values[..], ScalarType::Float)
+//     }
+// }
+
+macro_rules! IMPL_TENSORDATECONTAINER {
+    ($scalar_type: expr, $t:ty) => {
+        impl From<$t> for TensorDataContainer {
+            fn from(val: $t) -> Self {
+                TensorDataContainer::from_scalar(val.into(), $scalar_type)
+            }
+        }
+        impl From<&[$t]> for TensorDataContainer {
+            fn from(values: &[$t]) -> Self {
+                Self::from_slice(values, $scalar_type)
+            }
+        }
+        impl<const N: usize> From<&[$t; N]> for TensorDataContainer {
+            fn from(values: &[$t; N]) -> Self {
+                Self::from_slice(&values[..], $scalar_type)
+            }
+        }
+    };
 }
 
-impl From<&[f32]> for TensorDataContainer {
-    fn from(values: &[f32]) -> Self {
-        Self::from_slice(values, ScalarType::Float)
-    }
-}
-
-impl<const N: usize> From<&[f32; N]> for TensorDataContainer {
-    fn from(values: &[f32; N]) -> Self {
-        Self::from_slice(&values[..], ScalarType::Float)
-    }
-}
+IMPL_TENSORDATECONTAINER!(ScalarType::Float, f32);
+IMPL_TENSORDATECONTAINER!(ScalarType::Int, i32);
+IMPL_TENSORDATECONTAINER!(ScalarType::Double, f64);
+IMPL_TENSORDATECONTAINER!(ScalarType::Long, i64);

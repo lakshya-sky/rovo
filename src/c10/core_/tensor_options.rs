@@ -1,7 +1,7 @@
 use crate::c10::{
     get_default_dtype, Device, DeviceType, Layout, MemoryFormat, ScalarType, TypeMeta, K_STRIDED,
 };
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TensorOptions {
     dtype: TypeMeta,
     device: Device,
@@ -57,6 +57,7 @@ impl TensorOptions {
         let dtype: TypeMeta = dtype.into();
         Self {
             dtype,
+            has_dtype: true,
             ..Self::default()
         }
     }
@@ -174,7 +175,7 @@ impl TensorOptions {
     }
 
     pub fn dtype(&self) -> TypeMeta {
-        if self.has_device {
+        if self.has_dtype {
             self.dtype
         } else {
             get_default_dtype()

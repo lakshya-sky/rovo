@@ -5,7 +5,7 @@ pub fn select(self_: &Tensor, dim: i64, mut index: i64) -> Tensor {
         panic!("Select can't be applied to a 0-dim index");
     }
     let dim = maybe_wrap_dim(dim, ndim, true);
-    let size = self_.size(dim as isize);
+    let size = self_.size(dim as i64);
     if index < -(size as i64) || index >= (size as i64) {
         panic!();
     }

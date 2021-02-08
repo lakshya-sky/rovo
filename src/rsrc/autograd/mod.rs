@@ -4,5 +4,7 @@ mod saved_variable;
 pub use self::autogradmeta::*;
 pub use self::saved_variable::SavedTensor;
 pub use backward::*;
+mod function;
 mod variable_factories;
+pub use function::*;
 pub use variable_factories::*;

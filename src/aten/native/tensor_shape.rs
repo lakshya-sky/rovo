@@ -86,7 +86,7 @@ fn infer_squeeze_geometry(tensor: &Tensor) -> (Vec<usize>, Vec<usize>) {
 
     for d in 0..tensor.dim() as usize {
         if tensor.sizes()[d] != 1 {
-            sizes.push(tensor.size(d as isize));
+            sizes.push(tensor.size(d as i64));
             strides.push(tensor.stride(d));
         }
     }
@@ -99,7 +99,7 @@ fn infer_squeeze_geometry_with_dim(tensor: &Tensor, dim: usize) -> (Vec<usize>, 
 
     for d in 0..tensor.dim() as usize {
         if d != dim || tensor.sizes()[dim] != 1 {
-            sizes.push(tensor.size(d as isize));
+            sizes.push(tensor.size(d as i64));
             strides.push(tensor.stride(d));
         }
     }
@@ -125,7 +125,8 @@ fn alias_with_sizes_and_strides(self_: &Tensor, sizes: &[usize], strides: &[usiz
     //     impl->set_sizes_and_strides(sizes, strides);
     //     self_ = Tensor(std::move(impl));
     //   } else {
-    let mut impl_ = TensorImpl::new(self_.storage().clone(), self_.dtype().clone(), None);
+    let storage = self_.storage().clone();
+    let mut impl_ = TensorImpl::with_storage_and_dtype(storage, self_.dtype().clone());
     impl_.set_storage_offset(self_.storage_offset());
     impl_.set_sizes_and_strides(sizes, strides);
     new_self = Tensor::from_impl(impl_);

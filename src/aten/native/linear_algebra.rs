@@ -1,7 +1,7 @@
 use crate::aten::{self, native};
-use crate::c10::{Scalar, ScalarType};
+use crate::c10::Scalar;
 use crate::tensor::Tensor;
-use crate::{AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2, AT_PRIVATE_CASE_TYPE};
+use crate::AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2;
 
 // use crate::ndarry_ext;
 
@@ -117,7 +117,7 @@ pub fn addmm_impl_cpu_(
     let ldc = c.strides()[if transpose_c { 0 } else { 1 }];
 
     // Apply BLAS routine
-    AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2!(result.scalar_type(), "addmm_impl_cpu_", || {
+    AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2!(_, _, result.scalar_type(), "addmm_impl_cpu_", || {
         native::cpublas::gemm(
             if transpose_a {
                 native::cpublas::TransposeType::Transpose

@@ -3,7 +3,7 @@ use std::{
     ffi::c_void,
     iter::FromIterator,
     marker::PhantomData,
-    ops::{Index, IndexMut, Sub},
+    ops::{Index, IndexMut, Mul, Sub},
 };
 
 use std::ops::Add;
@@ -226,6 +226,17 @@ impl<T: num::Float> Sub<Self> for Vec256<T> {
     }
 }
 
+impl<T: num::Float> Mul<Self> for Vec256<T> {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        self.into_iter()
+            .zip(rhs.into_iter())
+            .map(|(a, b)| a * b)
+            .collect()
+    }
+}
+
 // TODO: Make this more efficient
 #[inline(always)]
 pub unsafe fn vec_reduce_all<T: num::Float, F>(
@@ -324,6 +335,50 @@ where
 }
 
 #[inline(always)]
+pub fn map2_reduce_all<T: num::Float, M, R>(
+    mut map_fun: M,
+    mut red_fun: R,
+    data: *mut T,
+    data2: *mut T,
+    size: usize,
+) -> T
+where
+    M: FnMut(Vec256<T>, Vec256<T>) -> Vec256<T>,
+    R: FnMut(Vec256<T>, Vec256<T>) -> Vec256<T>,
+{
+    let vec_size = Vec256::<T>::size();
+    if size < vec_size {
+        return unsafe {
+            let data_vec = Vec256::loadu(data as *const c_void, size);
+            let data2_vec = Vec256::loadu(data2 as *const c_void, size);
+            vec_reduce_all(red_fun, map_fun(data_vec, data2_vec), size)
+        };
+    }
+    let mut d = vec_size;
+    let mut acc_vec = map_fun(
+        Vec256::loadu(data as *const c_void, None),
+        Vec256::loadu(data2 as *const c_void, None),
+    );
+    let limit = size - (size % vec_size);
+    while d < limit {
+        let data_vec = Vec256::loadu(unsafe { data.add(d) as *const c_void }, None);
+        let data2_vec = Vec256::loadu(unsafe { data2.add(d) as *const c_void }, None);
+        acc_vec = red_fun(acc_vec, map_fun(data_vec, data2_vec));
+        d += vec_size;
+    }
+    if size - d > 0 {
+        let data_vec = Vec256::loadu(unsafe { data.add(d) as *const c_void }, size - d);
+        let data2_vec = Vec256::loadu(unsafe { data2.add(d) as *const c_void }, size - d);
+        acc_vec = Vec256::set(
+            &acc_vec,
+            &red_fun(acc_vec.clone(), map_fun(data_vec, data2_vec)),
+            size - d,
+        );
+    }
+    return unsafe { vec_reduce_all(red_fun, acc_vec, vec_size) };
+}
+
+#[inline(always)]
 pub fn map<T: num::Float, M>(
     mut vec_fun: M,
     output_data: *mut T,
@@ -338,25 +393,19 @@ where
     let limit = size - (size % vec_size);
     while d < limit {
         let output_vec = vec_fun(Vec256::loadu(
-            unsafe { input_data.offset(d as isize) as *const c_void },
+            unsafe { input_data.add(d) as *const c_void },
             None,
         ));
-        output_vec.store(
-            unsafe { output_data.offset(d as isize) as *mut c_void },
-            None,
-        );
-        d += vec_size
+        output_vec.store(unsafe { output_data.add(d) as *mut c_void }, None);
+        d += vec_size;
     }
 
     if size - d > 0 {
         let output_vec = vec_fun(Vec256::loadu(
-            unsafe { input_data.offset(d as isize) as *const c_void },
+            unsafe { input_data.add(d) as *const c_void },
             size - d,
         ));
-        output_vec.store(
-            unsafe { output_data.offset(d as isize) as *mut c_void },
-            size - d,
-        );
+        output_vec.store(unsafe { output_data.add(d) as *mut c_void }, size - d);
     }
 }
 

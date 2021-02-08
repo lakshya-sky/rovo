@@ -1,10 +1,7 @@
 use num::FromPrimitive;
 
 use crate::tensor::{Tensor, TensorIterator};
-use crate::{
-    c10::{Scalar, ScalarType},
-    AT_DISPATCH_ALL_TYPES_AND, AT_PRIVATE_CASE_TYPE,
-};
+use crate::{c10::Scalar, AT_DISPATCH_ALL_TYPES_AND};
 
 fn fill_fast<T: FromPrimitive>(self_: &Tensor, value: Scalar) {
     let value = value.to::<T>();

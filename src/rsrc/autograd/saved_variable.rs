@@ -48,6 +48,14 @@ impl SavedTensor {
         }
     }
 
+    pub fn new_with_optional(tensor: Option<&Tensor>, is_output: bool) -> Self {
+        let t = match tensor {
+            Some(t) => t.clone(),
+            None => Tensor::default(),
+        };
+        Self::new_consume(t, is_output)
+    }
+
     pub fn new_consume(tensor: Tensor, is_output: bool) -> Self {
         let was_default_constructed = false;
         let output_nr = tensor.output_nr();

@@ -1,10 +1,12 @@
-use crate::ops::NodeTrait;
-use crate::tensor::*;
 use crate::{
-    aten::native::sigmoid_backward,
+    aten::native::{self, log_softmax_backward_cpu, sigmoid_backward},
     c10::{Scalar, ScalarType},
+    ops::NodeTrait,
+    tensor::*,
+    util::index_generator::IndexGenerator,
 };
 use crate::{autograd::*, util::BitSet};
+use loss::Reduction;
 use smallvec::*;
 
 pub struct AccumulateGrad {
@@ -686,17 +688,30 @@ impl NodeTrait for AddmmBackward {
         let grad = grads.first().unwrap();
         let mat1 = self.mat1_.as_ref().unwrap().unpack();
         let mat2 = self.mat2_.as_ref().unwrap().unpack();
-        //Todo: imlement and use mm_mat2_backward and mm_mat1_backward
-        let mat2_grad = mm_mat2_backward(
-            grad,
-            &mat1,
-            self.mat2_sizes.as_slice(),
-            mat2.strides(),
-            self.alpha,
-        );
-        let mat1_grad = mm_mat1_backward(grad, &mat2, &mat1, self.alpha);
-        let self_grad = maybe_mutliply(grad.clone(), self.beta);
-        vec![self_grad, mat1_grad, mat2_grad]
+        let mut gen = IndexGenerator::new();
+        let self_idx = gen.next();
+        let mat1_idx = gen.next();
+        let mat2_idx = gen.next();
+        let mut grad_inputs = Vec::with_capacity(gen.len());
+        if self.should_compute_output(self_idx) {
+            let self_grad = maybe_mutliply(grad.clone(), self.beta);
+            grad_inputs.push(self_grad);
+        }
+        if self.should_compute_output(mat1_idx) {
+            let mat1_grad = mm_mat1_backward(grad, &mat2, &mat1, self.alpha);
+            grad_inputs.push(mat1_grad);
+        }
+        if self.should_compute_output(mat2_idx) {
+            let mat2_grad = mm_mat2_backward(
+                grad,
+                &mat1,
+                self.mat2_sizes.as_slice(),
+                mat2.strides(),
+                self.alpha,
+            );
+            grad_inputs.push(mat2_grad);
+        }
+        grad_inputs
     }
 
     fn set_next_edges(&mut self, edges: Vec<Edge>) {
@@ -733,7 +748,7 @@ impl NodeTrait for AddmmBackward {
     }
 
     fn debug_print(&self) -> String {
-        "MmBackward".to_string()
+        "AddMmBackward".to_string()
     }
 }
 
@@ -1094,11 +1109,9 @@ impl Default for LogSoftmaxBackward {
 impl NodeTrait for LogSoftmaxBackward {
     fn call(&mut self, input: Vec<Tensor>) -> Vec<Tensor> {
         let grad_input = input.first().unwrap();
-        let self_ = self.self_.as_ref().unwrap().unpack();
         let result = self.result.as_ref().unwrap().unpack();
-        // let grad_result = _log_softmax_backward_data(grad_input, &result, self.dim, self_);
-        // vec![grad_result]
-        todo!()
+        let grad_result = log_softmax_backward_cpu(grad_input, &result, self.dim);
+        vec![grad_result]
     }
 
     fn set_next_edges(&mut self, edges: Vec<Edge>) {
@@ -1136,5 +1149,86 @@ impl NodeTrait for LogSoftmaxBackward {
 
     fn debug_print(&self) -> String {
         "LogSoftmaxBackward".to_string()
+    }
+}
+pub struct NllLossBackward {
+    pub input_metadata_: SmallVec<[InputMetaData; 2]>,
+    pub next_edges: Option<EdgeList>,
+    pub self_: Option<SavedTensor>,
+    pub weight: Option<SavedTensor>,
+    pub target: Option<SavedTensor>,
+    pub total_weight: Option<SavedTensor>,
+    pub reduction: Reduction,
+    pub ignore_index: i64,
+}
+impl Default for NllLossBackward {
+    fn default() -> Self {
+        Self {
+            input_metadata_: smallvec![],
+            next_edges: None,
+            ignore_index: 0,
+            reduction: Reduction::Mean,
+            self_: None,
+            target: None,
+            weight: None,
+            total_weight: None,
+        }
+    }
+}
+
+impl NodeTrait for NllLossBackward {
+    fn call(&mut self, input: Vec<Tensor>) -> Vec<Tensor> {
+        let grad_input = input.first().unwrap();
+        let self_ = self.self_.as_ref().unwrap().unpack();
+        let weight = self.weight.as_ref().unwrap().unpack();
+        let target = self.target.as_ref().unwrap().unpack();
+        let total_weight = self.total_weight.as_ref().unwrap().unpack();
+        let grad_result = native::nll_loss_backward_cpu(
+            grad_input,
+            &self_,
+            &target,
+            &weight,
+            self.reduction,
+            self.ignore_index,
+            &total_weight,
+        );
+        vec![grad_result]
+    }
+
+    fn set_next_edges(&mut self, edges: Vec<Edge>) {
+        self.next_edges = Some(edges)
+    }
+
+    fn add_input_metadata(&mut self, tensor: &Tensor) -> usize {
+        let input_nr = self.input_metadata_.len();
+        self.input_metadata_
+            .push(InputMetaData::from_tensor(tensor));
+        input_nr
+    }
+
+    fn next_edges(&self) -> Option<&EdgeList> {
+        self.next_edges.as_ref()
+    }
+
+    fn next_edge(&self, i: usize) -> Option<Edge> {
+        let edges = self.next_edges.as_ref().unwrap();
+        let e = edges.get(i).and_then(|e| Some(e.clone()));
+        e
+    }
+
+    fn num_inputs(&self) -> usize {
+        self.input_metadata_.len()
+    }
+
+    fn num_outputs(&self) -> usize {
+        self.next_edges.as_ref().unwrap().len()
+    }
+
+    fn input_metadata(&self, index: usize) -> &InputMetaData {
+        self.input_metadata_.get(index).unwrap()
+    }
+
+    fn debug_print(&self) -> String {
+        "NllLossBackward".to_string()
     }
 }

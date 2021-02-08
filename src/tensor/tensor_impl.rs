@@ -16,7 +16,7 @@ impl VersionCounter {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct TensorVersion {
     pub version_counter: Rc<RefCell<VersionCounter>>,
 }
@@ -195,6 +195,7 @@ impl TensorVersion {
 //     }
 // }
 
+#[derive(Default)]
 pub struct TensorImpl {
     storage: Storage,
     pub autogradmeta: Option<AutogradMeta>,
@@ -210,6 +211,7 @@ pub struct TensorImpl {
     is_defined: bool,
     is_non_overlapping_and_dense: bool,
 }
+/*
 impl Default for TensorImpl {
     fn default() -> Self {
         Self {
@@ -229,6 +231,7 @@ impl Default for TensorImpl {
         }
     }
 }
+*/
 
 impl TensorImpl {
     pub fn new(storage: Storage, data_type: TypeMeta, device_opt: Option<Device>) -> Self {
@@ -252,6 +255,11 @@ impl TensorImpl {
             is_defined: true,
             is_non_overlapping_and_dense: false,
         }
+    }
+
+    pub fn with_storage_and_dtype(storage: Storage, data_type: TypeMeta) -> Self {
+        let device = Some(storage.device());
+        Self::new(storage, data_type, device)
     }
 
     pub fn defined(&self) -> bool {
@@ -441,7 +449,7 @@ impl TensorImpl {
         }
         is_contiguous
     }
-    pub fn size(&self, d: isize) -> usize {
+    pub fn size(&self, d: i64) -> usize {
         let d = maybe_wrap_dim(d as i64, self.dim(), false);
         self.sizes[d]
     }
@@ -538,17 +546,11 @@ impl TensorImpl {
             NonNull::new_unchecked(new_ptr as *mut c_void)
         }
     }
-    fn print_impl(&self) -> String {
-        let mut vec: Vec<f32> = vec![];
-        let data = self.data().as_ptr();
 
-        for i in 0..self.numel {
-            unsafe {
-                let el = data.add(i * self.data_type.itemsize()) as *const f32;
-                vec.push(*el);
-            };
-        }
-        format!("{:?}", vec.as_slice())
+    fn print_impl(&self) -> String {
+        let data = self.data().as_ptr();
+        let slice = std::ptr::slice_from_raw_parts(data as *const f64, self.numel);
+        format!("{:?}", unsafe { &*slice })
     }
 }
 impl std::fmt::Debug for TensorImpl {

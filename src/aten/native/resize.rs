@@ -1,5 +1,17 @@
 use crate::c10::{DataPtr, MemoryFormat, StorageImpl};
 use crate::tensor::{Tensor, TensorImpl};
+pub fn storage_size_for(size: &[usize], stride: &[usize]) -> usize {
+    debug_assert_eq!(size.len(), stride.len(), "storage_size_for(size, stride) requires that size and stride have the same size as a precondition.");
+    let mut storage_size = 1;
+    for dim in 0..size.len() {
+        if size[dim] == 0 {
+            storage_size = 0;
+            break;
+        }
+        storage_size += (size[dim] - 1) * stride[dim];
+    }
+    storage_size
+}
 
 pub fn resize<'a>(
     self_: &'a Tensor,
@@ -14,10 +26,9 @@ pub fn resize<'a>(
 
 pub fn resize_impl_cpu(self_: &mut TensorImpl, size: &[usize], stride: Option<&[usize]>) {
     let storage_size;
-    if let Some(_stride_) = stride {
-        storage_size = 1;
-        print!("{}", storage_size);
-        todo!()
+    if let Some(stride_) = stride {
+        self_.set_sizes_and_strides(size, stride_);
+        storage_size = storage_size_for(size, stride_);
     } else {
         self_.set_sizes_contiguous(size);
         storage_size = self_.numel();

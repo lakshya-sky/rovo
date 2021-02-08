@@ -3,7 +3,7 @@ use crate::c10::ScalarType;
 use crate::core::*;
 use crate::tensor::{Tensor, TensorIterator};
 use crate::Closure;
-use crate::{AT_DISPATCH_FLOATING_TYPES_AND2, AT_PRIVATE_CASE_TYPE};
+use crate::AT_DISPATCH_FLOATING_TYPES_AND2;
 
 pub fn uniform_kernel(mut iter: TensorIterator, from: f64, to: f64, gen: &mut dyn GeneratorImpl) {
     AT_DISPATCH_FLOATING_TYPES_AND2!(iter.dtype(), "uniform_cpu_kernel", || {

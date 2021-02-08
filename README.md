@@ -4,6 +4,8 @@
 
 Last:
 
+- softmax_kernel.rs:90 code is commented due to malloc error.
+- loss_nll should use loss_nll_forward with gradient support.
 - Handle case where iterator has no output. loops.rs:execute_op
 
 To-do:

@@ -71,9 +71,9 @@ pub fn grad_accumulator(tensor: &Tensor) -> Option<Rc<RefCell<Node>>> {
         if let Some(acc_) = meta.grad_accumulator_.as_ref() {
             Weak::upgrade(acc_)
         } else {
-            let result = Rc::new(RefCell::new(Node::new(AccumulateGrad::new(
-                Tensor::new(tensor),
-            ))));
+            let result = Rc::new(RefCell::new(Node::new(AccumulateGrad::new(Tensor::new(
+                tensor,
+            )))));
             meta.grad_accumulator_ = Some(Rc::downgrade(&result));
             Some(result)
         }
@@ -90,8 +90,11 @@ pub fn gradient_edge(tensor: &Tensor) -> Edge {
 }
 
 pub fn collect_next_edges(tensors: &[&Tensor]) -> Vec<Edge> {
-    let mut next_edges: Vec<Edge> = vec![];
-    next_edges.reserve(tensors.len());
+    /*
+        let mut next_edges: Vec<Edge> = vec![];
+        next_edges.reserve(tensors.len());
+    */
+    let mut next_edges: Vec<Edge> = Vec::with_capacity(tensors.len());
     for t in tensors {
         next_edges.push(gradient_edge(*t));
     }

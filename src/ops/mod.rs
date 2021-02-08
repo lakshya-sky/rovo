@@ -14,6 +14,11 @@ pub trait NodeTrait {
     fn num_outputs(&self) -> usize;
     fn input_metadata(&self, index: usize) -> &InputMetaData;
     fn debug_print(&self) -> String;
+    fn should_compute_output(&self, output_edge_index: usize) -> bool {
+        assert!(output_edge_index < self.num_outputs(), "Index out of range");
+        self.next_edges()
+            .map_or_else(|| false, |v| v[output_edge_index].is_valid())
+    }
 }
 
 pub struct Node {
@@ -60,6 +65,15 @@ impl Node {
 
     pub fn input_metadata(&self, index: usize) -> &InputMetaData {
         self._impl.input_metadata(index)
+    }
+    pub fn debug_print(&self) -> String {
+        self._impl.debug_print()
+    }
+
+    pub fn should_compute_output(&self, output_edge_index: usize) -> bool {
+        assert!(output_edge_index < self.num_outputs(), "Index out of range");
+        self.next_edges()
+            .map_or_else(|| false, |v| v[output_edge_index].is_valid())
     }
 }
 

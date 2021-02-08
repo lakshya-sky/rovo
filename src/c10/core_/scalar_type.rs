@@ -56,6 +56,12 @@ pub fn try_type_meta_to_scalar_type(dtype: &TypeMeta) -> Option<ScalarType> {
     if dtype == TypeMeta::make::<i32>() {
         return Some(ScalarType::Int);
     }
+    if dtype == TypeMeta::make::<f64>() {
+        return Some(ScalarType::Double);
+    }
+    if dtype == TypeMeta::make::<i64>() {
+        return Some(ScalarType::Long);
+    }
     return None;
 }
 

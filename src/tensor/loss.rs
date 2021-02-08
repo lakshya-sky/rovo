@@ -1,9 +1,7 @@
 use aten::native::cpu_kernel;
 
 use super::{Tensor, TensorIterator, TensorIteratorConfig};
-use crate::{
-    aten, autograd, c10::ScalarType, Closure, AT_DISPATCH_FLOATING_TYPES, AT_PRIVATE_CASE_TYPE,
-};
+use crate::{aten, autograd, Closure, AT_DISPATCH_FLOATING_TYPES};
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum Reduction {

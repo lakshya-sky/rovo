@@ -1,10 +1,9 @@
 #[inline(always)]
-pub fn maybe_wrap_dim(dim: i64, dim_post_expr: i64, _wrap_scalr: bool) -> usize {
-    let mut dim = dim;
-    let mut dim_post_expr = dim_post_expr;
+pub fn maybe_wrap_dim(mut dim: i64, mut dim_post_expr: i64, _wrap_scalr: bool) -> usize {
     if dim_post_expr <= 0 {
         dim_post_expr = 1;
     }
+
     let min = -dim_post_expr;
     let max = dim_post_expr - 1;
     assert!(
@@ -16,7 +15,7 @@ pub fn maybe_wrap_dim(dim: i64, dim_post_expr: i64, _wrap_scalr: bool) -> usize 
     );
 
     if dim < 0 {
-        dim += dim + dim_post_expr;
+        dim += dim_post_expr;
     }
 
     dim as usize

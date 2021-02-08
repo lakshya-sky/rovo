@@ -4,7 +4,7 @@
     non_upper_case_globals,
     non_snake_case
 )]
-#![feature(min_const_generics, trace_macros, int_bits_const)]
+#![feature(trace_macros, int_bits_const)]
 
 // trace_macros!(true);
 extern crate blas_src;

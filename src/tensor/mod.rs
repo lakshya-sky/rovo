@@ -21,11 +21,12 @@ pub type EdgeList = Vec<Edge>;
 impl std::fmt::Debug for Tensor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.defined() {
+            let tensor = self.to_dtype(crate::c10::ScalarType::Double);
             write!(
                 f,
                 "Tensor: {:?}\tsize: {:?}",
-                self.get_unsafe_tensor_impl(),
-                self.sizes()
+                tensor.get_unsafe_tensor_impl(),
+                tensor.sizes()
             )
         } else {
             write!(f, "Undefined Tensor")

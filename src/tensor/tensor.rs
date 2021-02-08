@@ -1,3 +1,4 @@
+use aten::core::{Number, TensorAccessor};
 use native::wrapped_scalar_tensor;
 
 use super::tensor_ops;
@@ -36,6 +37,9 @@ impl Edge {
 
     pub fn function(&self) -> Option<&Rc<RefCell<Node>>> {
         self.function.as_ref()
+    }
+    pub fn is_valid(&self) -> bool {
+        self.function.is_some()
     }
 }
 #[derive(Clone, Default)]
@@ -112,7 +116,7 @@ impl Tensor {
     pub fn numel(&self) -> usize {
         self.get_unsafe_tensor_impl().numel()
     }
-    pub fn size(&self, d: isize) -> usize {
+    pub fn size(&self, d: i64) -> usize {
         self.get_unsafe_tensor_impl().size(d)
     }
     pub fn stride(&self, d: usize) -> usize {
@@ -219,8 +223,13 @@ impl Tensor {
         self.get_unsafe_tensor_impl().data().as_ptr() as *mut T
     }
 
-    pub fn accessor<T, const N: usize>(&self) -> TensorAccessor<T, N> {
-        TensorAccessor::<T, N>::new(self.data_ptr_casted::<T>(), self.sizes(), self.strides())
+    pub fn accessor<T, N: Number>(&self, len: usize) -> TensorAccessor<T, N> {
+        TensorAccessor::new(
+            self.data_ptr_casted::<T>(),
+            self.sizes().as_ptr(),
+            self.strides().as_ptr(),
+            len,
+        )
     }
 
     pub fn scalar_type(&self) -> ScalarType {
@@ -302,7 +311,9 @@ impl Tensor {
     pub fn sum_dim(&self, dims: &[usize], keep_dim: bool) -> Tensor {
         tensor_ops::sum_dim_int_list(self, dims, keep_dim)
     }
-
+    pub fn log_softmax(&self, dim: i64, dtype: Option<ScalarType>) -> Tensor {
+        native::log_softmax(self, dim, dtype)
+    }
     /// Implicit flag is false by default, and is only true for
     /// oprations which broadcasts tensor implicitly.
     pub fn expand(&self, size: &[usize], implicit: bool) -> Tensor {

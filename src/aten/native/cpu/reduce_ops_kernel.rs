@@ -3,13 +3,12 @@ use std::ptr::NonNull;
 use crate::{
     aten::native::MeanOps,
     aten::{native::SharedOps, GRAIN_SIZE},
-    c10::ScalarType,
     tensor::TensorIterator,
-    AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2, AT_PRIVATE_CASE_TYPE,
+    AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2,
 };
 
 pub fn mean_kernel_impl(iter: TensorIterator) {
-    AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2!(iter.dtype(), "mean_cpu", || {
+    AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2!(_, _, iter.dtype(), "mean_cpu", || {
         let factor = iter.num_output_elements() as SCALART / iter.numel() as SCALART;
         binary_kernel_reduce(iter, MeanOps::<SCALART, SCALART>::new(factor), 0 as SCALART);
     });

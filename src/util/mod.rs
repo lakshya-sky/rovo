@@ -3,6 +3,7 @@ mod ordered_dict;
 
 pub use bitset::*;
 pub use ordered_dict::*;
+pub mod index_generator;
 pub mod vec256;
 
 pub fn is_expandable_to(shape: &[usize], desired: &[usize]) -> bool {

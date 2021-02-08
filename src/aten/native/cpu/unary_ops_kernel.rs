@@ -1,10 +1,9 @@
 use crate::aten::native::{cpu, loops};
 use crate::aten::util;
-use crate::c10::*;
 use crate::core::{get_default_cpu_generator, Generator};
 use crate::tensor::{Tensor, TensorIterator};
 use crate::Closure;
-use crate::{AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2, AT_PRIVATE_CASE_TYPE};
+use crate::AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2;
 
 pub fn uniform_kernel(iter: TensorIterator, from: f64, to: f64, mut gen: Option<Generator>) {
     let default_gen = &mut get_default_cpu_generator();
@@ -19,7 +18,7 @@ pub fn normal_kernel(self_: &Tensor, mean: f64, std: f64, mut gen: Option<Genera
 }
 
 pub fn sigmoid_kernel(iter: &mut TensorIterator) {
-    AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2!(iter.dtype(), "sigmoid_cpu", || {
+    AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2!(_, _, iter.dtype(), "sigmoid_cpu", || {
         loops::cpu_kernel_vec(
             iter,
             Closure::new(|args: [SCALART; 1]| -> SCALART {
@@ -33,7 +32,7 @@ pub fn sigmoid_kernel(iter: &mut TensorIterator) {
 }
 
 pub fn neg_kernel(iter: &mut TensorIterator) {
-    AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2!(iter.dtype(), "neg_cpu", || {
+    AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2!(_, _, iter.dtype(), "neg_cpu", || {
         loops::cpu_kernel_vec(
             iter,
             Closure::new(|args: [SCALART; 1]| -> SCALART { -args[0] }),

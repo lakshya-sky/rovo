@@ -48,22 +48,23 @@ impl Engine {
     pub fn validate_outputs(edges: Option<&Vec<Edge>>, mut grads: VariableList) -> VariableList {
         if let Some(edges) = edges {
             if edges.len() != grads.len() {
-                panic!(format!(
-                    "Invalid number of gradients - expected {}, but got {}",
-                    edges.len(),
-                    grads.len()
-                ))
+                let valid_edges = edges.iter().filter(|&e| e.is_valid()).collect::<Vec<_>>();
+                if valid_edges.len() != grads.len() {
+                    panic!(format!(
+                        "Invalid number of gradients - expected {}, but got {}",
+                        edges.len(),
+                        grads.len()
+                    ))
+                }
             }
             let mut new_grads = Vec::with_capacity(grads.len());
-            let mut i = 0;
             let grad_len = grads.len();
             // println!("Grads Length: {}", grads.len());
-            loop {
-                if i >= grad_len {
-                    break;
-                }
-                // println!("Index : {}", i);
+            for i in 0..grad_len {
                 let edge = edges.get(i).unwrap();
+                if !edge.is_valid() {
+                    continue;
+                }
                 let function = edge.function().unwrap().borrow();
                 let metadata = function.input_metadata(edge.input_nr);
                 // remove shrinks vector that's why can't use i so use 0 to always get first element.
@@ -76,7 +77,6 @@ impl Engine {
                 } else {
                     new_grads.push(grad);
                 }
-                i += 1;
             }
             new_grads
         } else {
