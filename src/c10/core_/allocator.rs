@@ -80,7 +80,7 @@ fn set_allocator(t: DeviceType, alloc: *mut dyn Allocator, priority: usize) {
 pub fn get_allocator(t: DeviceType) -> *mut dyn Allocator {
     unsafe {
         let alloc = ALLOCATORARRAY[t as usize];
-        assert!(alloc.is_some(), format!("Allocator for {:?} is not set", t));
+        assert!(alloc.is_some(), "Allocator for {:?} is not set", t);
         alloc.unwrap()
     }
 }

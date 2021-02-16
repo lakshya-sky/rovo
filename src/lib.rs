@@ -21,8 +21,8 @@ mod rsrc;
 pub use rsrc::*;
 
 pub mod tensor;
-mod util;
-mod util_autograd;
+pub mod util;
+pub mod util_autograd;
 
 use std::marker::PhantomData;
 pub struct Closure<I, O, F, const N: usize> {

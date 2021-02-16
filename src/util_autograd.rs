@@ -68,8 +68,16 @@ impl TensorHook {
 
 pub fn grad_accumulator(tensor: &Tensor) -> Option<Rc<RefCell<Node>>> {
     if let Some(meta) = TensorHook::get_autograd_meta(tensor) {
-        if let Some(acc_) = meta.grad_accumulator_.as_ref() {
-            Weak::upgrade(acc_)
+        if meta.grad_fn_.is_some() {
+            panic!("grad_accumulator() should be only called on leaf Variables");
+        }
+        if !meta.requires_grad {
+            return None;
+        }
+        let accumulator = meta.grad_accumulator_.as_ref();
+
+        if let Some(acc_) = accumulator.map_or_else(|| None, |a| a.upgrade()) {
+            Some(acc_)
         } else {
             let result = Rc::new(RefCell::new(Node::new(AccumulateGrad::new(Tensor::new(
                 tensor,
@@ -81,9 +89,10 @@ pub fn grad_accumulator(tensor: &Tensor) -> Option<Rc<RefCell<Node>>> {
         None
     }
 }
+
 pub fn gradient_edge(tensor: &Tensor) -> Edge {
     if let Some(grad_fn) = tensor.grad_fn() {
-        Edge::new(Some(grad_fn.clone()), tensor.output_nr())
+        Edge::new(Some(grad_fn), tensor.output_nr())
     } else {
         Edge::new(grad_accumulator(tensor), 0)
     }

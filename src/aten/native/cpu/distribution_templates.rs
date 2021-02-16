@@ -6,7 +6,7 @@ use crate::Closure;
 use crate::AT_DISPATCH_FLOATING_TYPES_AND2;
 
 pub fn uniform_kernel(mut iter: TensorIterator, from: f64, to: f64, gen: &mut dyn GeneratorImpl) {
-    AT_DISPATCH_FLOATING_TYPES_AND2!(iter.dtype(), "uniform_cpu_kernel", || {
+    AT_DISPATCH_FLOATING_TYPES_AND2!(_, _, iter.dtype(), "uniform_cpu_kernel", || {
         let from = from as SCALART;
         let to = to as SCALART;
         let uniform = UniformRealDistribution::new(from, to);

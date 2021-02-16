@@ -6,7 +6,7 @@ use crate::{
     aten::{parallel_for, GRAIN_SIZE},
     c10::{MemoryFormat, ScalarType, TensorOptions},
     tensor::{Tensor, _log_softmax, maybe_wrap_dim},
-    AT_DISPATCH_FLOATING_TYPES, AT_PRIVATE_CASE_TYPE,
+    AT_DISPATCH_FLOATING_TYPES,
 };
 
 use super::{
@@ -80,15 +80,15 @@ fn host_softmax<T: Float + Send>(output: &Tensor, input: &Tensor, dim: usize, lo
 }
 
 pub fn log_softmax(input_: &Tensor, dim_: i64, dtype: Option<ScalarType>) -> Tensor {
-    // let result = || -> Tensor {
-    let converted = if let Some(d) = dtype {
-        input_.to_dtype(d)
-    } else {
-        input_.clone()
-    };
-    return _log_softmax(&converted, dim_, false);
-    // }();
-    // return result;
+    let result = || -> Tensor {
+        let converted = if let Some(d) = dtype {
+            input_.to_dtype(d)
+        } else {
+            input_.clone()
+        };
+        return _log_softmax(&converted, dim_, false);
+    }();
+    return result;
 }
 
 fn host_softmax_backward<T: Float + Send>(
@@ -204,7 +204,7 @@ pub fn log_softmax_backward_cpu(grad_: &Tensor, output_: &Tensor, dim_: i64) -> 
     } else {
         run_dispatch_log_softmax_backward(&grad_input, &grad, &output, dim);
     }
-    return output;
+    return grad_input;
 }
 
 fn run_dispatch_log_softmax_forward(input: &Tensor, output: &Tensor, dim: usize) {

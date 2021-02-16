@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::Read;
 use std::primitive::u64;
 
-mod mt19937_engine;
+pub mod mt19937_engine;
 
 pub struct Generator {
     impl_: Box<dyn GeneratorImpl>,
@@ -149,7 +149,7 @@ mod test {
 
     #[test]
     fn test_set_get_current_seed() {
-        let  foo = get_default_cpu_generator();
+        let foo = get_default_cpu_generator();
         foo.set_current_seed(123);
         let current_seed = foo.current_seed();
         assert_eq!(current_seed, 123);

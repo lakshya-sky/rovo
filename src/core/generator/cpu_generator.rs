@@ -48,7 +48,8 @@ impl CPUGeneratorImpl {
     }
 
     pub fn random_(&self) -> u32 {
-        self.engine.lock().unwrap().call()
+        let t = self.engine.lock().unwrap().call();
+        t
     }
 
     pub fn random64_(&self) -> u64 {

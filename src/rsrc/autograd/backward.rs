@@ -37,7 +37,6 @@ fn _make_grads(outputs: &VariableList, grad_outputs: &VariableList) -> VariableL
     if grad_outputs.is_empty() {
         for output in outputs {
             if output.requires_grad() {
-                 println!("Pushing new Grads to GradList");
                 new_grads.push(ones_like(output, TensorOptions::default()))
             }
         }

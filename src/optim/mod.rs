@@ -33,11 +33,52 @@ pub trait Optimizer {
         }
     }
 }
+
+pub struct SGDOptionsBuilder {
+    lr: f64,
+    momentum: f64,
+    dampening: f64,
+    weight_decay: f64,
+    nesterov: bool,
+}
+impl Default for SGDOptionsBuilder {
+    fn default() -> Self {
+        Self {
+            lr: 0.001,
+            momentum: 0.0,
+            dampening: 0.0,
+            weight_decay: 0.0,
+            nesterov: false,
+        }
+    }
+}
+impl SGDOptionsBuilder {
+    pub fn new(lr: f64) -> Self {
+        Self {
+            lr,
+            ..Default::default()
+        }
+    }
+    pub fn momentum(&mut self, momentum: f64) -> &mut Self {
+        self.momentum = momentum;
+        self
+    }
+    pub fn build(&self) -> SGDOptions {
+        let mut options = SGDOptions::default();
+        options.set_lr(self.lr);
+        options.set_momentum(self.momentum);
+        options.set_weight_decay(self.weight_decay);
+        options.set_nesterov(self.nesterov);
+        options.set_dampening(self.dampening);
+        options
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct SGDOptions {
     lr: f64,
     momentum: f64,
-    dempening: f64,
+    dampening: f64,
     weight_decay: f64,
     nesterov: bool,
 }
@@ -47,21 +88,38 @@ impl Default for SGDOptions {
         Self {
             lr: 0.001,
             momentum: 0.0,
-            dempening: 0.0,
+            dampening: 0.0,
             weight_decay: 0.0,
             nesterov: false,
         }
     }
 }
+
 impl SGDOptions {
     pub fn new(lr: f64) -> Self {
         Self {
             lr,
             momentum: 0.0,
-            dempening: 0.0,
+            dampening: 0.0,
             weight_decay: 0.0,
             nesterov: false,
         }
+    }
+
+    pub fn set_lr(&mut self, lr: f64) {
+        self.lr = lr
+    }
+    pub fn set_momentum(&mut self, momentum: f64) {
+        self.momentum = momentum
+    }
+    pub fn set_dampening(&mut self, dampening: f64) {
+        self.dampening = dampening;
+    }
+    pub fn set_weight_decay(&mut self, weight_decay: f64) {
+        self.weight_decay = weight_decay;
+    }
+    pub fn set_nesterov(&mut self, nestrov: bool) {
+        self.nesterov = nestrov;
     }
     pub fn lr(&self) -> f64 {
         self.lr
@@ -69,8 +127,8 @@ impl SGDOptions {
     pub fn momentum(&self) -> f64 {
         self.momentum
     }
-    pub fn dempening(&self) -> f64 {
-        self.dempening
+    pub fn dampening(&self) -> f64 {
+        self.dampening
     }
     pub fn weight_decay(&self) -> f64 {
         self.weight_decay
@@ -111,9 +169,9 @@ impl Optimizer for SGD {
         }
         let weight_decay = self.options.weight_decay();
         let learning_rate = self.options.lr();
-        let _momentum = self.options.momentum();
-        let _dempening = self.options.dempening();
-        let _nesterov = self.options.nesterov();
+        let momentum = self.options.momentum();
+        let dampening = self.options.dampening();
+        let nesterov = self.options.nesterov();
 
         for group in self.param_groups.iter_mut() {
             for p in group.params() {
@@ -123,15 +181,16 @@ impl Optimizer for SGD {
                             // eprintln!("Weight Grad Before: {:?}", borrow_);
                             d_p.add_scalar(weight_decay);
                         }
-                        // if momentum != 0.0{
+                        // if momentum != 0.0 {
                         //     let buf;
 
-                        //     if nesterov{
+                        //     if nesterov {
                         //         d_p = d_p.add(buf, momentum);
-                        //     }else{
+                        //     } else {
                         //         d_p = buf;
                         //     }
                         // }
+
                         p.add_with_alpha_(d_p, -1.0 * learning_rate);
                     }
                     None => continue,

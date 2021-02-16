@@ -13,6 +13,22 @@ use rovo::{
 use rovo::{c10::TensorOptions, nn::Functional};
 
 #[test]
+fn linear_parameter_test() {
+    init_rovo();
+    manual_seed(1);
+    let mut model = Sequential::new();
+    model.add(Linear::new(4, 3));
+    dbg!(model.parameters());
+    //Expected: [
+    //     Tensor: [0.2576315999031067, -0.22068911790847778, -0.09693074226379395,
+    // 0.23468446731567383, -0.4707184433937073, 0.29985862970352173, -0.1028626561164856,
+    // 0.2543719410896301, 0.06950849294662476, -0.061222076416015625, 0.13868045806884766,
+    // 0.024665892124176025]   size: [3, 4],
+    //     Tensor: [0.18261408805847168, -0.19485050439834595, -0.03645437955856323]       size: [3],
+    // ],
+}
+
+#[test]
 fn linear_backward_test() {
     init_rovo();
     manual_seed(0);
@@ -85,4 +101,33 @@ fn sequential_sgd_step() {
     //                          0.0003843791, 0.001923646, -0.002772328]   size: [4, 3])
     println!("Result: {:?}", result);
     println!("Input Grad: {:?}", x.grad());
+}
+
+#[test]
+fn sequential_sgd_two_steps() {
+    init_rovo();
+    manual_seed(0);
+    let x = full(&[4, 3], 1.5, TensorOptions::with_requires_grad());
+    let target = ones(&[4, 2], None);
+    let mut model = Sequential::new();
+    model.add(Linear::new(3, 2));
+
+    let mut sgd = SGD::new(model.parameters().unwrap(), SGDOptions::new(0.1));
+
+    let step = |optimizer: &mut SGD, model: &Sequential, inputs: Tensor, target: &Tensor| {
+        let closure = || {
+            let y = model.forward(&[&inputs]);
+            let loss = target - &y;
+            backward::backward(&vec![loss.clone()], &vec![], false);
+            loss
+        };
+        let step = optimizer.step(Some(closure));
+        step
+    };
+
+    for i in 0..2 {
+        let result = step(&mut sgd, &model, x.clone(), &target);
+
+        println!("Result: {:?}", result);
+    }
 }

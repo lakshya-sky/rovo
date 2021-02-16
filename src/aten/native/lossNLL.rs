@@ -196,11 +196,6 @@ fn nll_loss_out_frame<T: Float>(
     let target_contiguous = target.contiguous();
 
     let input_data = input_contiguous.data_ptr_casted::<T>();
-    unsafe {
-        println!("{:?}", target);
-        let tmp = target_contiguous.data_ptr_casted::<i64>();
-        println!("{}", tmp.read());
-    }
     let target_data = target_contiguous.data_ptr_casted::<i64>();
 
     let mut output_val = T::zero();

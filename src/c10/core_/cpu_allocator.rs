@@ -19,14 +19,14 @@ fn alloc_cpu(nbytes: usize) -> Option<NonNull<c_void>> {
         let mut data: *mut c_void = std::mem::MaybeUninit::uninit().assume_init();
         let err = libc::posix_memalign(&mut data, GALIGNMENT, nbytes);
         if err != 0 {
-            panic!(format!(
+            panic!(
                 "DefaultCPUAllocator: can't allocate memory: you tried to allocate {} bytes. Error code {}({})",
                 nbytes,
                 err,
                 std::ffi::CStr::from_ptr(libc::strerror(err) as *const libc::c_char)
                     .to_str()
                     .unwrap()
-            ));
+            );
         }
         Some(NonNull::new(data).unwrap())
     }

@@ -15,7 +15,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::{ffi::c_void, ptr::NonNull};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Edge {
     pub function: Option<Rc<RefCell<Node>>>,
     pub input_nr: usize,
@@ -31,7 +31,6 @@ impl Edge {
     pub fn new(function: Option<Rc<RefCell<Node>>>, input_nr: usize) -> Edge {
         // let n = Rc::into_raw(function);
         // let q = Some(unsafe { Rc::from_raw(n) });
-
         Edge { function, input_nr }
     }
 
@@ -174,11 +173,7 @@ impl Tensor {
     pub fn grad_fn(&self) -> Option<Rc<RefCell<Node>>> {
         let t = self._impl.borrow();
         if let Some(p) = t.autogradmeta.as_ref() {
-            if let Some(grad_fn) = p.grad_fn() {
-                Some(grad_fn.clone())
-            } else {
-                None
-            }
+            p.grad_fn()
         } else {
             None
         }

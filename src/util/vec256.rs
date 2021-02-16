@@ -215,6 +215,17 @@ impl<T: num::Float> Add<Self> for Vec256<T> {
     }
 }
 
+impl<T: num::Float> Add<Self> for &Vec256<T> {
+    type Output = Vec256<T>;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        self.into_iter()
+            .zip(rhs.into_iter())
+            .map(|(a, b)| a + b)
+            .collect()
+    }
+}
+
 impl<T: num::Float> Sub<Self> for Vec256<T> {
     type Output = Self;
 

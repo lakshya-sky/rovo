@@ -20,7 +20,7 @@ pub trait NodeTrait {
             .map_or_else(|| false, |v| v[output_edge_index].is_valid())
     }
 }
-
+#[derive(Debug)]
 pub struct Node {
     pub _impl: Box<dyn NodeTrait>,
 }

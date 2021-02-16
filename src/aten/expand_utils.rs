@@ -58,12 +58,14 @@ pub fn sum_to(mut tensor: Tensor, shape: &[usize]) -> Tensor {
             reduce_dims.push(i);
         }
     }
+
     if !reduce_dims.is_empty() {
         tensor = tensor.sum_dim(reduce_dims.as_slice(), true)
     }
-    if leading_dims > 0 {
+    let return_tensor = if leading_dims > 0 {
         tensor.view(shape)
     } else {
         tensor
-    }
+    };
+    return_tensor
 }

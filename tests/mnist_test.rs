@@ -4,7 +4,7 @@ use rovo::{
     core::manual_seed,
     init_rovo,
     nn::{nll_loss, Functional, Linear, Module, NLLLossFuncOptions, Sequential},
-    optim::{Optimizer, SGDOptions, SGD},
+    optim::{Optimizer, SGDOptions, SGDOptionsBuilder, SGD},
     tensor::{log_softmax, Tensor},
 };
 use std::{
@@ -90,16 +90,12 @@ pub fn load_data(
 fn mnist_nn() {
     init_rovo();
     manual_seed(1);
-
     let mut model = Sequential::new();
-
-    model.add(Linear::new(784, 128));
+    model.add(Linear::new(784, 32));
     model.add(Functional::new(Functional::sigmoid()));
-    model.add(Linear::new(128, 10));
-    model.add(Functional::new(Functional::sigmoid()));
-
-    let mut sgd = SGD::new(model.parameters().unwrap(), SGDOptions::new(0.1));
-
+    model.add(Linear::new(32, 10));
+    let sgd_options = SGDOptionsBuilder::new(0.01).momentum(0.0).build();
+    let mut sgd = SGD::new(model.parameters().unwrap(), sgd_options);
     let step = |optimizer: &mut SGD, model: &Sequential, inputs: Tensor, target: Tensor| {
         // Note: Can't put the following line into closure beacuse
         // zero_grad uses immutable reference and step uses mutable reference.
@@ -107,37 +103,20 @@ fn mnist_nn() {
         let closure = || {
             let y = model.forward(&[&inputs]);
             let y = log_softmax(&y, 1, None);
-            // let y = y.sum();
-            // println!("LogSoftmax result: {:?}", y);
-            // println!("target: {:?}", target);
-            // let loss = &y - &target;
             let loss = nll_loss(&y, &target, NLLLossFuncOptions::default());
             backward::backward(&vec![loss.clone()], &vec![], false);
             loss
         };
         optimizer.step(Some(closure))
     };
-
-    let train_data = load_data("/Users/darshankathiriya/Downloads", "train", 1).unwrap();
-    // dbg!(model
-    //     .parameters()
-    //     .iter()
-    //     .flatten()
-    //     .filter_map(|p| p.grad())
-    //     .collect::<Vec<_>>());
+    let train_data = load_data("/Users/darshankathiriya/Downloads", "train", 8).unwrap();
     for (index, data) in train_data.iter().enumerate() {
         let image = &data.image;
         let target = tensor(data.classification as i64, None);
         target.resize(&[1], None);
         let result = step(&mut sgd, &model, image.clone(), target);
-        if index % 10 == 0 {
+        if index % 1 == 0 {
             println!("Loss: {:?}", result,);
         }
-        // dbg!(model
-        //     .parameters()
-        //     .iter()
-        //     .flatten()
-        //     .filter_map(|p| p.grad())
-        //     .collect::<Vec<_>>());
     }
 }

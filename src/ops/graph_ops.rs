@@ -29,15 +29,16 @@ impl AccumulateGrad {
 
 impl NodeTrait for AccumulateGrad {
     fn call(&mut self, grads: Vec<Tensor>) -> Vec<Tensor> {
-        // println!(
-        //     "calling AccumulateGrad for Tensor: {:?}",
-        //     self.tensor
-        // );
         let new_grad = &grads[0];
         let grad = self.tensor.grad();
+        // if self.tensor.ndimension() == 1 {
+        //     println!(
+        //         "calling AccumulateGrad for Tensor: {:?},\n{:?}",
+        //         self.tensor, new_grad
+        //     );
+        // }
         if let Some(g) = grad {
-            let t = g.clone();
-            self.tensor.set_grad(&t + new_grad);
+            self.tensor.set_grad(&g + new_grad);
         } else {
             let t = Tensor::new(new_grad);
             self.tensor.set_grad(t);
@@ -309,10 +310,18 @@ pub struct SubBackwardTensors {
 impl NodeTrait for SubBackwardTensors {
     fn call(&mut self, mut grads: Vec<Tensor>) -> Vec<Tensor> {
         let _tmp: Vec<_> = grads.drain(1..).collect();
+        let mut gen = IndexGenerator::new();
+        let self_idx = gen.next();
+        let other_idx = gen.next();
+        let mut grad_inputs = Vec::with_capacity(gen.len());
         let grad = grads.get(0).unwrap().clone();
-        let grad_1 = grad.clone();
-        let grad_2 = -&grad.clone();
-        vec![grad_1, grad_2]
+        if self.should_compute_output(self_idx) {
+            grad_inputs.push(grad.clone())
+        }
+        if self.should_compute_output(other_idx) {
+            grad_inputs.push(-&grad.clone())
+        }
+        grad_inputs
     }
 
     fn set_next_edges(&mut self, edges: Vec<Edge>) {
@@ -763,6 +772,7 @@ impl NodeTrait for SigmoidBackward {
         let grad_input = input.first().unwrap();
         let result = self.result_.as_ref().unwrap().unpack();
         let grad_result = sigmoid_backward(grad_input, &result);
+        // dbg!(&grad_result);
         vec![grad_result]
     }
 

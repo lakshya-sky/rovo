@@ -369,10 +369,9 @@ impl TensorIterator {
 
                 assert!(
                     op.target_dtype == self.common_dtype_,
-                    format!(
-                        "Found dtype {:?} but expected {:?}",
-                        op.target_dtype, self.common_dtype_
-                    )
+                    "Found dtype {:?} but expected {:?}",
+                    op.target_dtype,
+                    self.common_dtype_
                 );
             }
         }
@@ -414,10 +413,9 @@ impl TensorIterator {
             {
                 assert!(
                     can_cast(self.common_dtype_, op.current_dtype),
-                    format!(
-                        "result type {:?} can't be cast to the desired output type {:?}",
-                        self.common_dtype_, op.current_dtype
-                    )
+                    "result type {:?} can't be cast to the desired output type {:?}",
+                    self.common_dtype_,
+                    op.current_dtype
                 );
             }
             if common_device == KCPU {
@@ -701,11 +699,9 @@ impl TensorIterator {
 
                 assert!(
                     self.is_reduction_,
-                    format!(
-                        "output with shape {:?} doesn't match the broadcast shape {:?}",
-                        tensor.sizes(),
-                        self.shape_
-                    )
+                    "output with shape {:?} doesn't match the broadcast shape {:?}",
+                    tensor.sizes(),
+                    self.shape_
                 );
             }
         }

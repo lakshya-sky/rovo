@@ -1,5 +1,5 @@
-const MERSENNE_STATE_N: u32 = 624;
-const MERSENNE_STATE_M: u32 = 397;
+const MERSENNE_STATE_N: usize = 624;
+const MERSENNE_STATE_M: usize = 397;
 const MATRIX_A: u32 = 0x9908b0df;
 const UMASK: u32 = 0x80000000;
 const LMASK: u32 = 0x7fffffff;
@@ -46,7 +46,7 @@ impl MT19937Engine {
         self.data.seed = seed;
         self.data.seeded = true;
         self.data.state[0] = (seed & 0xffffffff) as u32;
-        for j in 1..MERSENNE_STATE_N {
+        for j in 1..MERSENNE_STATE_N as u32 {
             self.data.state[j as usize] = 1812433253u32
                 .overflowing_mul(
                     self.data.state[(j - 1) as usize] ^ (self.data.state[(j - 1) as usize] >> 30),
@@ -105,7 +105,8 @@ impl MT19937Engine {
         for _ in (1..MERSENNE_STATE_M).rev() {
             unsafe {
                 *p = *p.offset(MERSENNE_STATE_M as isize - MERSENNE_STATE_N as isize)
-                    ^ Self::twist(*p.offset(0), *p.offset(1))
+                    ^ Self::twist(*p.offset(0), *p.offset(1));
+                p = p.offset(1);
             }
         }
 

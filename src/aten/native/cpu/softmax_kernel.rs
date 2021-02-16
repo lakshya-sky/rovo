@@ -6,7 +6,7 @@ use crate::{
     aten::{parallel_for, GRAIN_SIZE},
     tensor::Tensor,
     util::vec256::{self, Vec256},
-    AT_DISPATCH_FLOATING_TYPES_AND2, 
+    AT_DISPATCH_FLOATING_TYPES_AND2,
 };
 
 #[inline(always)]
@@ -94,8 +94,6 @@ fn _vec_log_softmax_lastdim<T: num::Float, const CHUNK_SIZE: usize>(
                     input_data,
                     dim_size,
                 );
-                //dbg!(output_data);
-                //unsafe { dbg!(&*(output_data as *const f32)) };
             }
         }
     };
@@ -176,7 +174,7 @@ impl vec_host_softmax_lastdim {
         input: &Tensor,
         log_softmax: bool,
     ) {
-        let outer_size = input.sizes().iter().product();
+        let outer_size = input.sizes()[0..input.ndimension() - 1].iter().product();
         let dim_size = input.size(input.dim() - 1);
 
         let input_data_base = input.data_ptr_casted::<SCALART>();
@@ -205,7 +203,7 @@ impl vec_host_softmax_backward_lastdim {
         log_softmax: bool,
     ) {
         let dim_size = grad.size(grad.dim() - 1);
-        let outer_size = grad.sizes().iter().product();
+        let outer_size = grad.sizes()[0..grad.ndimension() - 1].iter().product();
 
         let grad_input_data_base = grad_input.data_ptr_casted::<SCALART>();
         let grad_data_base = grad.data_ptr_casted::<SCALART>();
@@ -228,6 +226,8 @@ impl vec_host_softmax_backward_lastdim {
 #[inline(always)]
 pub fn log_softmax_lastdim_kernel_impl(result: &Tensor, self_: &Tensor) {
     AT_DISPATCH_FLOATING_TYPES_AND2!(
+        _,
+        _,
         self_.scalar_type(),
         "log_softmax_lastdim_kernel_impl",
         || {
@@ -245,6 +245,8 @@ pub fn log_softmax_backward_lastdim_kernel_impl(
     output: &Tensor,
 ) {
     AT_DISPATCH_FLOATING_TYPES_AND2!(
+        _,
+        _,
         grad.scalar_type(),
         "log_softmax_backward_lastdim_kernel_impl",
         || {

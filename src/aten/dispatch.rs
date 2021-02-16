@@ -44,7 +44,7 @@ macro_rules! AT_DISPATCH_ALL_TYPES_AND {
 
 #[macro_export]
 macro_rules! AT_DISPATCH_FLOATING_TYPES_AND2{
-    ($TYPE: expr, $name: expr, $($args:expr),+)=>{{
+    (_,_,$TYPE: expr, $name: expr, $($args:expr),+)=>{{
         $crate::AT_PRIVATE_CASE_TYPE!($TYPE, $crate::c10::ScalarType::Float, f32, $($args)+);
         $crate::AT_PRIVATE_CASE_TYPE!($TYPE, $crate::c10::ScalarType::Double, f64, $($args)+);
     }}

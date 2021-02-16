@@ -45,39 +45,40 @@ impl Engine {
         }
     }
 
+    // This function takes edges and inputs to those edges. if the edge is valid then there should be corresponding
+    // grad input. It loops in reverse order so grads vec doesn't have shift other elements. Due to that new grads will be in reverse order.
+    // while returning them, the vector is reversed.
     pub fn validate_outputs(edges: Option<&Vec<Edge>>, mut grads: VariableList) -> VariableList {
         if let Some(edges) = edges {
-            if edges.len() != grads.len() {
-                let valid_edges = edges.iter().filter(|&e| e.is_valid()).collect::<Vec<_>>();
-                if valid_edges.len() != grads.len() {
-                    panic!(format!(
-                        "Invalid number of gradients - expected {}, but got {}",
-                        edges.len(),
-                        grads.len()
-                    ))
-                }
+            let mut valid_edges = edges.iter().filter(|&e| e.is_valid()).collect::<Vec<_>>();
+            if valid_edges.len() != grads.len() {
+                panic!(
+                    "Invalid number of gradients - expected {}, but got {}",
+                    edges.len(),
+                    grads.len()
+                )
             }
             let mut new_grads = Vec::with_capacity(grads.len());
             let grad_len = grads.len();
-            // println!("Grads Length: {}", grads.len());
-            for i in 0..grad_len {
-                let edge = edges.get(i).unwrap();
+            for i in (0..grad_len).rev() {
+                let edge = valid_edges.pop().unwrap();
                 if !edge.is_valid() {
                     continue;
                 }
                 let function = edge.function().unwrap().borrow();
                 let metadata = function.input_metadata(edge.input_nr);
                 // remove shrinks vector that's why can't use i so use 0 to always get first element.
-                let grad = grads.remove(0);
+                let grad = grads.pop().unwrap();
                 if grad.sizes() != metadata.shape() {
                     if !util::is_expandable_to(metadata.shape(), grad.sizes()) {
-                        panic!(format!("invalid gradient at index {} - got {:?}, but expected shape comapatible with {:?}", i, grad.sizes(), metadata.shape()));
+                        panic!("invalid gradient at index {} - got {:?}, but expected shape comapatible with {:?}", i, grad.sizes(), metadata.shape());
                     }
                     new_grads.push(aten::sum_to(grad, metadata.shape()))
                 } else {
                     new_grads.push(grad);
                 }
             }
+            new_grads.reverse();
             new_grads
         } else {
             grads
@@ -98,22 +99,25 @@ impl Engine {
         inputs: InputBuffer,
     ) {
         let _fnc = func.as_ptr();
-        let outputs = Self::call_function(func.as_ptr(), inputs);
+        let mut outputs = Self::call_function(func.as_ptr(), inputs);
         let fn_ = func.borrow_mut();
-        let num_outputs = outputs.len();
-        let mut i = 0usize;
         let task = graph_task.borrow();
         let mut dependencies = task.dependencies.borrow_mut();
-        loop {
-            if i >= num_outputs {
-                break;
-            }
-            let output = outputs.get(i).unwrap().clone();
-            let next = fn_.next_edge(i);
-            if next.is_none() {
+        // Get next_edges. if they exists then filter only valid edges. other wise return.
+        let edges = fn_.next_edges().map(|e| {
+            return e.iter().filter(|e| e.is_valid()).collect::<Vec<_>>();
+        });
+        if edges.is_none() {
+            return;
+        }
+        let mut edges = edges.unwrap();
+        assert!(edges.len() == outputs.len());
+        while outputs.len() > 0 {
+            let next = edges.pop().unwrap();
+            if !next.is_valid() {
                 continue;
             }
-            let next = next.unwrap();
+            let output = outputs.pop().unwrap();
             let mut is_ready = false;
             let t = next.function.as_ref().unwrap().as_ptr() as *const Node;
             let it = dependencies.get_mut(&t);
@@ -151,13 +155,10 @@ impl Engine {
                             input_buffer,
                         ));
                     }
-                // let outstanding_task = task.outstanding_tasks.as_ptr();
-                // unsafe { *outstanding_task = *outstanding_task + 1 };
                 } else {
                     not_ready.insert(t, input_buffer);
                 }
             }
-            i += 1;
         }
     }
 
@@ -176,10 +177,8 @@ impl Engine {
                     AutoGradMode::new(unsafe { &*local_graph_task.as_ptr() }.grad_mode);
                 self.evaluate_function(local_graph_task.clone(), task.fn_, task.inputs_);
             }
-
-            let outstanding_task = graph_task.outstanding_tasks.as_ptr();
-            unsafe { *outstanding_task = *outstanding_task - 1 };
-
+            let outstanding_task = &graph_task.outstanding_tasks;
+            outstanding_task.set(outstanding_task.get() - 1);
             if graph_task.completed() {
                 break;
             }
@@ -196,8 +195,6 @@ impl Engine {
             root,
             InputBuffer::new_with_size(0),
         ));
-        // let outstanding_task = task.borrow().outstanding_tasks.as_ptr();
-        // unsafe { *outstanding_task = *outstanding_task + 1 };
         self.thread_main(task);
     }
 
