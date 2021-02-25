@@ -4,7 +4,7 @@
 
 Last:
 
-- softmax_kernel.rs:90 code is commented due to malloc error.
+- Implement method to find maximum element and index for maximum element.
 - loss_nll should use loss_nll_forward with gradient support.
 - Handle case where iterator has no output. loops.rs:execute_op
 

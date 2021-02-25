@@ -41,6 +41,7 @@ impl Edge {
         self.function.is_some()
     }
 }
+
 #[derive(Clone, Default)]
 pub struct Tensor {
     pub _impl: Rc<RefCell<TensorImpl>>,

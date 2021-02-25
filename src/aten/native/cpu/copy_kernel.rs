@@ -8,7 +8,7 @@ use crate::{
 pub fn copy_kernel(_: DeviceType, iter: &mut TensorIterator, _non_blocking: bool) {
     let dtype = iter.dtype_(0);
     if dtype == iter.dtype_(1) {
-        AT_DISPATCH_ALL_TYPES_AND!(dtype, "copy_kernel", || {
+        AT_DISPATCH_ALL_TYPES_AND!(_, dtype, "copy_kernel", || {
             cpu_kernel_vec(
                 iter,
                 Closure::new(|args: [SCALART; 1]| -> SCALART { args[0] }),

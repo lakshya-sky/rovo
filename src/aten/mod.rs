@@ -1,5 +1,6 @@
 pub mod core;
 pub mod native;
+pub mod numeric_utils;
 
 mod util;
 pub use util::*;

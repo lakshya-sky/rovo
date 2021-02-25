@@ -1,3 +1,4 @@
+// default _wrap_scalr: true
 #[inline(always)]
 pub fn maybe_wrap_dim(mut dim: i64, mut dim_post_expr: i64, _wrap_scalr: bool) -> usize {
     if dim_post_expr <= 0 {

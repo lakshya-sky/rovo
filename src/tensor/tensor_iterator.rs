@@ -304,6 +304,7 @@ impl TensorIterator {
             self_.coalesce_dimensions();
         }
         for op in &mut self_.operands_ {
+            assert!(op.tensor.defined());
             op.data = Some(op.tensor.data_ptr());
         }
 
@@ -1136,6 +1137,9 @@ impl TensorIteratorConfig {
         promote_inputs_to_common_dtype: bool,
     ) -> &mut Self {
         self.promote_inputs_to_common_dtype_ = promote_inputs_to_common_dtype;
+        if promote_inputs_to_common_dtype {
+            self.check_all_same_dtype_ = false
+        }
         self
     }
     pub fn is_reduction(&mut self, is_reduction: bool) -> &mut Self {

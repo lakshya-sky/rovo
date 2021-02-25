@@ -138,6 +138,37 @@ pub fn scalar_tensor<A: AsRef<TensorOptions>>(s: Scalar, options: A) -> Tensor {
     result.fill_(s);
     result
 }
+/* ~~~~~~~~~~~~~~~~~~~~~~~~~~~ Zeros ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+pub fn zeros<A: AsRef<TensorOptions>>(size: &[usize], options: A) -> Tensor {
+    let options = options.as_ref();
+    let mut result = empty(size, options, None);
+    result.zero_();
+    result
+}
+
+pub fn zeros_out<'a>(result: &'a mut Tensor, size: &[usize]) -> &'a Tensor {
+    //    if result.is_sparse(){
+    //
+    //    }
+    result.resize(size, None);
+    result.zero_();
+    result
+}
+
+pub fn zeroes_like<T: Into<Option<MemoryFormat>>, A: AsRef<TensorOptions>>(
+    self_: &Tensor,
+    options: A,
+    optional_memory_format: T,
+) -> Tensor {
+    let mut result = empty_like(self_, options, optional_memory_format);
+    result.zero_();
+    result
+}
+
+pub fn new_zeros<A: AsRef<TensorOptions>>(self_: &Tensor, size: &[usize], options: A) -> Tensor {
+    return zeros(size, self_.options().merge_in(options));
+}
 
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~ Tensor from slice ~~~~~~~~~~~~~~~~~~~~~~~*/
 

@@ -1,27 +1,29 @@
+use crate::aten::numeric_utils::IsNaN;
 use std::marker::PhantomData;
 
 pub trait SharedOps<A> {
     type ProjectArg;
+    type ProjectRt;
     type ReduceArg1;
     type ReduceArg2;
     type CombineArg1;
     type CombineArg2;
-    fn reduce(a: A, b: A, _idx: usize) -> A;
-    fn combine(a: A, b: A) -> A;
-    fn project(&self, a: A) -> A;
+    fn reduce(a: Self::ReduceArg1, b: Self::ReduceArg2, _idx: usize) -> A;
+    fn combine(a: Self::CombineArg1, b: Self::CombineArg2) -> A;
+    fn project(&self, a: Self::ProjectArg) -> Self::ProjectRt;
     fn translate_idx(acc: A, _base_dix: usize) -> A;
 }
 
 pub struct MeanOps<A, F> {
     factor: F,
-    _phtm: PhantomData<A>,
+    _ph: PhantomData<A>,
 }
 
 impl<A, F> MeanOps<A, F> {
     pub fn new(factor: F) -> Self {
         Self {
             factor,
-            _phtm: PhantomData,
+            _ph: PhantomData,
         }
     }
 }
@@ -36,6 +38,7 @@ where
     type ReduceArg2 = A;
     type CombineArg1 = A;
     type CombineArg2 = A;
+    type ProjectRt = A;
 
     #[inline(always)]
     fn reduce(a: A, b: A, _idx: usize) -> A {
@@ -58,29 +61,78 @@ where
     }
 }
 
-/*inline C10_DEVICE acc_t reduce(acc_t a, acc_t b, int64_t /*idx*/) const {
-    return combine(a, b);
-  }
+trait CompareOps<T> {
+    fn call(a: T, b: T, idx_a: usize, idx_b: usize) -> bool;
+}
 
-  inline C10_DEVICE acc_t combine(acc_t a, acc_t b) const {
-    return a + b;
-  }
+struct GreaterOrNan<T>(PhantomData<T>);
 
-  inline C10_DEVICE acc_t project(acc_t a) const {
-    return a * factor;
-  }
+impl<T: IsNaN + PartialOrd> GreaterOrNan<T> {
+    fn call(a: T, b: T, idx_a: usize, idx_b: usize) -> bool {
+        if a.is_nan() {
+            if b.is_nan() {
+                return idx_a < idx_b;
+            }
+            return true;
+        }
+        if a == b {
+            idx_a < idx_b
+        } else {
+            a > b
+        }
+    }
+}
 
-  static C10_DEVICE acc_t translate_idx(acc_t acc, int64_t /*base_idx*/) {
-    return acc;
-  }
+struct MinMaxReductionOps<A, C>(PhantomData<A>, PhantomData<C>);
 
-#if defined(__CUDACC__) || defined(__HIPCC__)
-  inline C10_DEVICE acc_t warp_shfl_down(acc_t data, int offset) const {
-    return WARP_SHFL_DOWN(data, offset);
-  }
-#endif
+impl<A, C> MinMaxReductionOps<A, C> {
+    pub fn new() -> Self {
+        Self(PhantomData, PhantomData)
+    }
+}
 
-  MeanOps(factor_t factor): factor(factor) {
-  }
-};
-*/
+pub struct ArgMaxOps<T: IsNaN + PartialOrd> {
+    _ph: PhantomData<T>,
+}
+impl<T: IsNaN + PartialOrd> ArgMaxOps<T> {
+    pub fn new() -> Self {
+        Self { _ph: PhantomData }
+    }
+}
+impl<T: IsNaN + PartialOrd + Copy> SharedOps<(T, usize)> for ArgMaxOps<T> {
+    type ProjectArg = (T, usize);
+
+    type ReduceArg1 = (T, usize);
+
+    type ReduceArg2 = T;
+
+    type CombineArg1 = (T, usize);
+
+    type CombineArg2 = (T, usize);
+
+    type ProjectRt = usize;
+
+    fn reduce(a: Self::ReduceArg1, b: Self::ReduceArg2, idx: usize) -> (T, usize) {
+        if GreaterOrNan::<T>::call(a.0, b, a.1, idx) {
+            a
+        } else {
+            (b, idx)
+        }
+    }
+
+    fn combine(a: Self::CombineArg1, b: Self::CombineArg2) -> (T, usize) {
+        if GreaterOrNan::<T>::call(a.0, b.0, a.1, b.1) {
+            a
+        } else {
+            b
+        }
+    }
+
+    fn project(&self, a: Self::ProjectArg) -> Self::ProjectRt {
+        a.1
+    }
+
+    fn translate_idx(acc: (T, usize), base_idx: usize) -> (T, usize) {
+        (acc.0, acc.1 + base_idx)
+    }
+}

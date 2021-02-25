@@ -27,7 +27,7 @@ macro_rules! AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2 {
 
 #[macro_export]
 macro_rules! AT_DISPATCH_ALL_TYPES_AND {
-    ($TYPE: expr, $name: expr, $($args:expr),+) => {{
+    (_,$TYPE: expr, $name: expr, $($args:expr),+) => {{
         // match $TYPE {
         //     ScalarType::Int => {
         //         type SCALART = i32;

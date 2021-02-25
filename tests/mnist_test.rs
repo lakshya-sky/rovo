@@ -97,8 +97,6 @@ fn mnist_nn() {
     let sgd_options = SGDOptionsBuilder::new(0.01).momentum(0.0).build();
     let mut sgd = SGD::new(model.parameters().unwrap(), sgd_options);
     let step = |optimizer: &mut SGD, model: &Sequential, inputs: Tensor, target: Tensor| {
-        // Note: Can't put the following line into closure beacuse
-        // zero_grad uses immutable reference and step uses mutable reference.
         optimizer.zero_grad();
         let closure = || {
             let y = model.forward(&[&inputs]);
@@ -109,14 +107,22 @@ fn mnist_nn() {
         };
         optimizer.step(Some(closure))
     };
-    let train_data = load_data("/Users/darshankathiriya/Downloads", "train", 8).unwrap();
+    let train_data = load_data("/Users/darshankathiriya/Downloads", "train", 20000).unwrap();
+    let test_data = load_data("/Users/darshankathiriya/Downloads", "t10k", 1000).unwrap();
+    let mut test_iter = test_data.iter();
     for (index, data) in train_data.iter().enumerate() {
         let image = &data.image;
         let target = tensor(data.classification as i64, None);
         target.resize(&[1], None);
         let result = step(&mut sgd, &model, image.clone(), target);
-        if index % 1 == 0 {
+        if index % 1000 == 0 {
             println!("Loss: {:?}", result,);
+            let test_item = test_iter.next().unwrap();
+            let test_x = &test_item.image;
+            let test_y = test_item.classification;
+            let y_hat = model.forward(&[test_x]);
+            let y_hat = log_softmax(&y_hat, 1, None);
+            println!("Test Result: target= {:?}, prediction= {:?}", test_y, y_hat);
         }
     }
 }

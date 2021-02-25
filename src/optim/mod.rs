@@ -169,9 +169,9 @@ impl Optimizer for SGD {
         }
         let weight_decay = self.options.weight_decay();
         let learning_rate = self.options.lr();
-        let momentum = self.options.momentum();
-        let dampening = self.options.dampening();
-        let nesterov = self.options.nesterov();
+        let _momentum = self.options.momentum();
+        let _dampening = self.options.dampening();
+        let _nesterov = self.options.nesterov();
 
         for group in self.param_groups.iter_mut() {
             for p in group.params() {

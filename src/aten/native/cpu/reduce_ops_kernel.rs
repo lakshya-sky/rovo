@@ -1,23 +1,36 @@
+use crate::{
+    aten::{
+        native::{ArgMaxOps, MeanOps, SharedOps},
+        numeric_utils::lower_bound,
+        GRAIN_SIZE,
+    },
+    tensor::TensorIterator,
+    AT_DISPATCH_ALL_TYPES_AND, AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2,
+};
 use std::ptr::NonNull;
 
-use crate::{
-    aten::native::MeanOps,
-    aten::{native::SharedOps, GRAIN_SIZE},
-    tensor::TensorIterator,
-    AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2,
-};
+pub fn argmax_kernel_impl(iter: &TensorIterator) {
+    AT_DISPATCH_ALL_TYPES_AND!(_, iter.dtype_(1), "argmax_cpu", || {
+        binary_kernel_reduce(
+            iter,
+            ArgMaxOps::<SCALART>::new(),
+            (lower_bound::<SCALART>(), 0),
+        )
+    });
+}
 
-pub fn mean_kernel_impl(iter: TensorIterator) {
+pub fn mean_kernel_impl(iter: &TensorIterator) {
     AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2!(_, _, iter.dtype(), "mean_cpu", || {
         let factor = iter.num_output_elements() as SCALART / iter.numel() as SCALART;
         binary_kernel_reduce(iter, MeanOps::<SCALART, SCALART>::new(factor), 0 as SCALART);
     });
 }
 
-fn binary_kernel_reduce<O, I, ACC_T, DATA_T>(iter: TensorIterator, ops: O, init: I)
+fn binary_kernel_reduce<O, I, ACC_T, DATA_T>(iter: &TensorIterator, ops: O, init: I)
 where
-    O: SharedOps<ACC_T, ProjectArg = ACC_T, ReduceArg2 = DATA_T>,
-    ACC_T: Default + Copy,
+    O: SharedOps<ACC_T, ProjectArg = ACC_T, ReduceArg1 = ACC_T, ReduceArg2 = DATA_T>,
+    ACC_T: Copy,
+    DATA_T: Copy,
     I: Into<ACC_T> + Copy,
 {
     let num_outputs = iter.noutputs();
@@ -29,7 +42,7 @@ where
                 let mut in_ = data[ntensors - 1].as_ptr();
                 let stride = strides[ntensors - 1];
                 for i in 0..size {
-                    acc = O::reduce(acc, unsafe { *(in_ as *mut ACC_T) }, begin + i);
+                    acc = O::reduce(acc, unsafe { *(in_ as *mut DATA_T) }, begin + i);
                     in_ = unsafe { in_.add(stride) };
                 }
             };

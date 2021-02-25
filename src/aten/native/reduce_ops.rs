@@ -1,92 +1,68 @@
 use c10::isFloatingType;
 
 use crate::{
-    autograd::empty,
     c10::{self, ScalarType},
-    tensor::{maybe_wrap_dim, DimMask, DimVector, Tensor, TensorIterator},
+    tensor::{maybe_wrap_dim, Tensor},
 };
 
-use super::cpu::{mean_kernel_impl, sum_kernel_impl};
+use super::{
+    super::native,
+    cpu::{argmax_kernel_impl, mean_kernel_impl, sum_kernel_impl},
+    reduce_ops_utils::{get_dtype, make_reduction},
+};
 
-fn make_dim_mask(dims: &[usize], ndim: i64) -> DimMask {
-    let mut mask = DimMask::default();
-    if dims.is_empty() {
-        mask.flip_all();
-    } else {
-        for dim in dims {
-            let pos_dim = maybe_wrap_dim(*dim as i64, ndim, false);
-            assert!(
-                pos_dim < 64,
-                "reduction operations for dim>=64 are not supported"
-            );
-            mask.set(pos_dim);
-        }
-    }
-    return mask;
-}
-
-fn allocate_reduction_result(
-    result: &mut Tensor,
+pub fn argmax_out<'result>(
+    result: &'result mut Tensor,
     self_: &Tensor,
-    mask: &DimMask,
-    keepdim: bool,
-    dtype: ScalarType,
-) {
-    let mut shape: DimVector = self_.sizes().into();
-    for dim in (0..shape.len()).rev() {
-        if mask.check(dim) {
+    dim: Option<i64>,
+    mut keepdim: bool,
+) -> &'result Tensor {
+    assert!(self_.numel() > 0, "cannot perform reduction function argmax on a tensor with no elements because the operation does not have an identity");
+    let in_: Tensor;
+    let wrap_dim;
+    if let Some(dim) = dim {
+        let sizes = self_.sizes();
+        wrap_dim = maybe_wrap_dim(dim, self_.dim(), true);
+        if sizes[wrap_dim] == 1 {
             if keepdim {
-                shape[dim] = 1;
+                result.move_tensor(native::zeros(
+                    sizes,
+                    self_.options().set_dtype_(ScalarType::Long),
+                ))
             } else {
-                shape.remove(dim);
+                let mut sizes_vec = sizes.to_vec();
+                sizes_vec.remove(wrap_dim);
+                result.move_tensor(native::zeros(
+                    sizes_vec.as_slice(),
+                    self_.options().set_dtype_(ScalarType::Long),
+                ))
             }
+            return result;
         }
-    }
-    if result.defined() {
-        result.resize(shape.as_slice(), None);
+        in_ = self_.clone();
     } else {
-        let mut optns = self_.options();
-        optns.set_dtype_mut(Some(dtype.into()));
-        result.move_tensor(empty(shape.as_slice(), optns, None));
+        //in_ = self_.reshape([-1]);
+        in_ = native::empty(&[0], self_.options(), None);
+        keepdim = false;
+        wrap_dim = 0;
     }
+    let iter = make_reduction(
+        "argmax",
+        result,
+        &in_,
+        &[wrap_dim],
+        keepdim,
+        self_.scalar_type(),
+        ScalarType::Long,
+    );
+    argmax_kernel_impl(&iter);
+    result
 }
 
-fn review_reduce_result(result: &Tensor, ndim: i64, mask: DimMask, keepdim: bool) -> Tensor {
-    if keepdim {
-        return result.clone();
-    }
-    let mut shape: DimVector = result.sizes().into();
-    let mut stride: DimVector = result.strides().into();
-
-    for dim in 0..ndim as usize {
-        if mask.check(dim) {
-            shape.insert(dim, 1);
-            stride.insert(dim, 0);
-        }
-    }
-    return result.as_strided(shape.as_slice(), stride.as_slice());
-}
-
-fn make_reduction(
-    _name: &str,
-    result: &mut Tensor,
-    self_: &Tensor,
-    dim: &[usize],
-    keepdim: bool,
-    in_dtype: ScalarType,
-    out_dtype: ScalarType,
-) -> TensorIterator {
-    // check that result type and dtype match if provided
-    assert!((!result.defined() || result.scalar_type() == out_dtype));
-
-    let ndim = self_.dim();
-    let mask = make_dim_mask(dim, ndim);
-    allocate_reduction_result(result, self_, &mask, keepdim, out_dtype);
-    let viewed_result = review_reduce_result(result, ndim, mask, keepdim);
-    if self_.scalar_type() == in_dtype {
-        return TensorIterator::reduce_op(&viewed_result, self_);
-    }
-    return TensorIterator::reduce_op(&viewed_result, &self_.to_dtype(in_dtype));
+pub fn argmax(self_: &Tensor, dim: Option<i64>, keepdims: bool) -> Tensor {
+    let mut result = native::empty(&[0], self_.options().set_dtype_(ScalarType::Long), None);
+    argmax_out(&mut result, self_, dim, keepdims);
+    result
 }
 
 pub fn mean_out_cpu_gpu<'result>(
@@ -126,10 +102,11 @@ pub fn mean_out_cpu_gpu<'result>(
     if iter.numel() == 0 {
         result.fill_(f64::NAN);
     } else {
-        mean_kernel_impl(iter);
+        mean_kernel_impl(&iter);
     }
     result
 }
+
 pub fn mean(self_: &Tensor, dtype: Option<ScalarType>) -> Tensor {
     return mean_cpu_gpu_(self_, &[], false, dtype);
 }
@@ -160,24 +137,6 @@ pub fn sum_dim_int_list(
     result
 }
 
-fn get_dtype(
-    result: &Tensor,
-    self_: &Tensor,
-    dtype: Option<ScalarType>,
-    promote_integers: bool,
-) -> ScalarType {
-    if let Some(d) = dtype {
-        return d;
-    } else if result.defined() {
-        return result.scalar_type();
-    }
-    let src_type = self_.scalar_type();
-    if promote_integers && c10::isIntegralType(src_type, /*includeBool=*/ true) {
-        return c10::kLong;
-    }
-    return src_type;
-}
-
 fn sum_out<'result>(
     result: &'result mut Tensor,
     self_: &Tensor,
@@ -190,33 +149,7 @@ fn sum_out<'result>(
     if iter.numel() == 0 {
         result.zero_();
     } else {
-        let _numel = iter.numel();
-
-        let dtype = iter.dtype();
-        match dtype {
-            ScalarType::Float => do_reduction::<f32>(&iter, result, self_),
-            _ => panic!(),
-        };
-
         sum_kernel_impl(&iter);
     }
     return result;
-}
-
-fn do_reduction<T: std::fmt::Debug + num::Zero + std::ops::AddAssign + Copy>(
-    iter: &TensorIterator,
-    result: &Tensor,
-    self_: &Tensor,
-) {
-    let pt = self_.data_ptr();
-    let numel = iter.numel();
-    let mut output = T::zero();
-    let ptr_ = pt.as_ptr() as *mut T;
-    for i in 0..numel {
-        unsafe { output += *ptr_.offset(i as isize) };
-    }
-    unsafe {
-        let result_ptr = result.data_ptr().as_ptr() as *mut T;
-        *result_ptr = output;
-    }
 }
