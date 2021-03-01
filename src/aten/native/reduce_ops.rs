@@ -41,8 +41,7 @@ pub fn argmax_out<'result>(
         }
         in_ = self_.clone();
     } else {
-        //in_ = self_.reshape([-1]);
-        in_ = native::empty(&[0], self_.options(), None);
+        in_ = self_.reshape(&[-1]);
         keepdim = false;
         wrap_dim = 0;
     }

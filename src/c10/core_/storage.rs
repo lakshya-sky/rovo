@@ -106,12 +106,14 @@ impl Storage {
     pub fn new(ptr: Rc<RefCell<StorageImpl>>) -> Self {
         Self { storage_impl: ptr }
     }
+
     pub fn data<T>(&self) -> NonNull<T> {
         match self.get_unsafe_storage_impl().data() {
             Some(d) => unsafe { NonNull::new_unchecked(d) },
             None => panic!("data ptr is null"),
         }
     }
+
     pub fn unsafe_data<T>(&self) -> NonNull<T> {
         self.data()
     }

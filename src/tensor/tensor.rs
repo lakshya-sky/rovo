@@ -133,6 +133,11 @@ impl Tensor {
     ) -> &Tensor {
         native::resize(self, size, optional_memory_format)
     }
+
+    pub fn reshape(&self, shape: &[isize]) -> Self {
+        native::reshape(&self, shape)
+    }
+
     pub fn copy(&self, src: &Self, non_blocking: Option<bool>) -> &Self {
         native::copy_(self, src, non_blocking.unwrap_or(false))
     }

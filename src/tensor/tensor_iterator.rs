@@ -309,9 +309,10 @@ impl TensorIterator {
         }
 
         let ndim_offsets = if self_.ndim() > 0 { self_.ndim() } else { 1 };
-        self_.view_offsets = smallvec::smallvec![ndim_offsets;0];
+        self_.view_offsets = smallvec::smallvec![0;ndim_offsets];
         self_
     }
+
     fn compute_types(&mut self, config: &TensorIteratorConfig) {
         let common_device = KCPU;
         self.common_dtype_ = ScalarType::Undefined;

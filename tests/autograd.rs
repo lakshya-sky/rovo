@@ -9,6 +9,7 @@ fn tensor_from_slice() {
     );
     println!("{:?}", tensor);
 }
+
 #[test]
 fn tensor_from_i64_slice() {
     init_rovo();

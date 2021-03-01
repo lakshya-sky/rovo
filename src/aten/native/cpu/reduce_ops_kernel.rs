@@ -29,7 +29,7 @@ pub fn mean_kernel_impl(iter: &TensorIterator) {
 fn binary_kernel_reduce<O, I, ACC_T, DATA_T>(iter: &TensorIterator, ops: O, init: I)
 where
     O: SharedOps<ACC_T, ProjectArg = ACC_T, ReduceArg1 = ACC_T, ReduceArg2 = DATA_T>,
-    ACC_T: Copy,
+    ACC_T: Copy + std::fmt::Debug,
     DATA_T: Copy,
     I: Into<ACC_T> + Copy,
 {
@@ -37,7 +37,7 @@ where
     let closure = |sub_iter: &TensorIterator| {
         let reduction_body = |mut acc: ACC_T, begin: usize, end: usize| -> ACC_T {
             let ntensors = sub_iter.ntensors();
-            let loop_ = move |data: &[NonNull<u8>], strides: &[usize], size: usize| {
+            let loop_ = |data: &[NonNull<u8>], strides: &[usize], size: usize| {
                 assert_eq!(ntensors - num_outputs, 1);
                 let mut in_ = data[ntensors - 1].as_ptr();
                 let stride = strides[ntensors - 1];

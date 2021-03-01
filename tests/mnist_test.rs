@@ -1,5 +1,6 @@
 use byteorder::{BigEndian, ReadBytesExt};
 use rovo::{
+    aten::native::argmax,
     autograd::{backward, tensor},
     core::manual_seed,
     init_rovo,
@@ -122,7 +123,11 @@ fn mnist_nn() {
             let test_y = test_item.classification;
             let y_hat = model.forward(&[test_x]);
             let y_hat = log_softmax(&y_hat, 1, None);
-            println!("Test Result: target= {:?}, prediction= {:?}", test_y, y_hat);
+            println!(
+                "Test Result: target= {:?}, prediction= {:?}",
+                test_y,
+                argmax(&y_hat, None, false)
+            );
         }
     }
 }

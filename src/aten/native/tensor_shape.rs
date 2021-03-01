@@ -147,3 +147,35 @@ pub fn view(self_: &Tensor, size: &[usize]) -> Tensor {
     let stride_value = stride.unwrap();
     alias_with_sizes_and_strides(self_, inferred_size.as_slice(), stride_value.as_slice())
 }
+
+pub fn reshape(self_: &Tensor, proposed_shape: &[isize]) -> Tensor {
+    /*
+      if (self.is_sparse()) {
+      AT_ERROR("reshape is not implemented for sparse tensors");
+    }
+    */
+    let shape = infer_size(proposed_shape, self_.numel());
+
+    //   if (self.is_mkldnn()) {
+    //     return at::_mkldnn_reshape(self, shape);
+    //   }
+    let stride = computeStride(self_.sizes(), self_.strides(), shape.as_slice());
+    if stride.is_some() {
+        return self_.view(shape.as_slice());
+    }
+    _unsafe_view(&self_.clone().contiguous(), shape.as_slice())
+}
+
+// _unsafe_view() differs from view() in that the returned tensor isn't treated
+// as a view for the purposes of automatic differentiation. (It's not listed in
+// VIEW_FUNCTIONS in gen_autograd.py).  It's only safe to use if the `self` tensor
+// is temporary. For example, the viewed tensor here (a + b) is discarded immediately
+// after viewing:
+//
+//  res = at::_unsafe_view(a + b, size);
+//
+// This is a hack because in-place operations on tensors treated like views
+// can be much more expensive than the same operations on non-view tensors.
+fn _unsafe_view(self_: &Tensor, size: &[usize]) -> Tensor {
+    return self_.view(size);
+}
