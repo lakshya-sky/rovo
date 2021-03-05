@@ -44,7 +44,7 @@ impl Edge {
 
 #[derive(Clone, Default)]
 pub struct Tensor {
-    pub _impl: Rc<RefCell<TensorImpl>>,
+    pub _impl: Rc<RefCell<Option<TensorImpl>>>,
 }
 
 unsafe impl Send for Tensor {}
@@ -56,20 +56,17 @@ unsafe impl Sync for Tensor {}
 //         impl_.clone()
 //     }
 // }
+
 impl Tensor {
     pub fn from_impl(_impl: TensorImpl) -> Self {
         Self {
-            _impl: Rc::new(RefCell::new(_impl)),
+            _impl: Rc::new(RefCell::new(Some(_impl))),
         }
     }
     pub fn new(other: &Self) -> Self {
         Self {
             _impl: other._impl.clone(),
         }
-    }
-    pub fn get_unsafe_tensor_impl(&self) -> &mut TensorImpl {
-        let t = self._impl.as_ptr();
-        unsafe { &mut *t }
     }
 
     pub fn move_tensor(&mut self, other: Tensor) {
@@ -81,15 +78,30 @@ impl Tensor {
         } else {
             todo!();
         }
-        // self._impl = other._impl
+    }
+
+    // Safety: it is safe here because Rc<RefCell<T>> will always give underlying pointer to T.
+    // However, if Option<TensorImpl> resolves to None (Tensor is not defined) then it will panic.
+    #[inline(always)]
+    pub fn get_unsafe_tensor_impl(&self) -> &mut TensorImpl {
+        let t = self._impl.as_ptr();
+        unsafe { (&mut *t).as_mut().unwrap() }
+    }
+
+    // Safety: it is safe here because Rc<RefCell<T>> will always point to valid a Option<TensorImpl>.
+    #[inline(always)]
+    pub fn get_tensor_impl(&self) -> Option<&mut TensorImpl> {
+        let t = self._impl.as_ptr();
+        unsafe { (&mut *t).as_mut() }
+    }
+
+    #[inline(always)]
+    pub fn defined(&self) -> bool {
+        self.get_tensor_impl().is_some()
     }
 
     pub fn is_same(&self, other: &Self) -> bool {
         self._impl.as_ptr() == other._impl.as_ptr()
-    }
-
-    pub fn storage(&self) -> &Storage {
-        self.get_unsafe_tensor_impl().storage()
     }
 
     pub fn fill_(&self, value: impl Into<Scalar>) {
@@ -97,15 +109,51 @@ impl Tensor {
     }
 
     pub fn sizes(&self) -> &[usize] {
+        if !self.defined() {
+            panic!("sizes() called on an undefined Tensor");
+        }
         self.get_unsafe_tensor_impl().sizes()
     }
+
+    pub fn size(&self, d: i64) -> usize {
+        if !self.defined() {
+            panic!("size(dim) called on an undefined Tensor");
+        }
+        self.get_unsafe_tensor_impl().size(d)
+    }
+
     pub fn strides(&self) -> &[usize] {
+        if !self.defined() {
+            panic!("strides() called on an undefined Tensor");
+        }
         self.get_unsafe_tensor_impl().strides()
     }
+
+    pub fn stride(&self, d: usize) -> usize {
+        if !self.defined() {
+            panic!("stride(dim) called on an undefined Tensor");
+        }
+        self.get_unsafe_tensor_impl().stride(d)
+    }
+
+    pub fn storage(&self) -> &Storage {
+        if !self.defined() {
+            panic!("storage() called on an undefined Tensor");
+        }
+        self.get_unsafe_tensor_impl().storage()
+    }
+
     pub fn storage_offset(&self) -> usize {
+        if !self.defined() {
+            panic!("storage_offset() called on an undefined Tensor");
+        }
         self.get_unsafe_tensor_impl().storage_offset()
     }
+
     pub fn dim(&self) -> i64 {
+        if !self.defined() {
+            panic!("dim() called on an undefined Tensor");
+        }
         self.get_unsafe_tensor_impl().dim()
     }
 
@@ -116,12 +164,7 @@ impl Tensor {
     pub fn numel(&self) -> usize {
         self.get_unsafe_tensor_impl().numel()
     }
-    pub fn size(&self, d: i64) -> usize {
-        self.get_unsafe_tensor_impl().size(d)
-    }
-    pub fn stride(&self, d: usize) -> usize {
-        self.get_unsafe_tensor_impl().stride(d)
-    }
+
     pub fn resize_as_(&self, other: &Self) -> &Self {
         native::resize_as_(self, other, None)
     }
@@ -156,37 +199,57 @@ impl Tensor {
     pub fn element_size(&self) -> usize {
         self.get_unsafe_tensor_impl().itemsize()
     }
-    pub fn defined(&self) -> bool {
-        self.get_unsafe_tensor_impl().defined()
-    }
 
     pub fn grad(&self) -> Option<Self> {
-        self._impl.borrow().grad()
-    }
-
-    pub fn set_grad(&mut self, other: Self) {
-        self._impl.borrow_mut().set_grad(other);
-    }
-
-    pub fn requires_grad(&self) -> bool {
-        self._impl.borrow().requires_grad()
-    }
-
-    pub fn set_requires_grad(&self, requires_grad: bool) {
-        self._impl.borrow_mut().set_requires_grad(requires_grad);
-    }
-
-    pub fn grad_fn(&self) -> Option<Rc<RefCell<Node>>> {
-        let t = self._impl.borrow();
-        if let Some(p) = t.autogradmeta.as_ref() {
-            p.grad_fn()
+        if let Some(impl_) = self.get_tensor_impl() {
+            impl_.grad()
         } else {
             None
         }
     }
 
+    pub fn set_grad(&mut self, grad: Self) {
+        if !self.defined() {
+            panic!("set_grad(Tensor) is called on an undefined tensor.")
+        }
+        self._impl.borrow_mut().as_mut().unwrap().set_grad(grad)
+    }
+
+    pub fn requires_grad(&self) -> bool {
+        if !self.defined() {
+            return false;
+        }
+        self._impl.borrow().as_ref().unwrap().requires_grad()
+    }
+
+    pub fn set_requires_grad(&self, requires_grad: bool) {
+        if !self.defined() {
+            panic!("set_requires_grad is called on an undefined Tensor.")
+        }
+        self._impl
+            .borrow_mut()
+            .as_mut()
+            .unwrap()
+            .set_requires_grad(requires_grad);
+    }
+
+    pub fn grad_fn(&self) -> Option<Rc<RefCell<Node>>> {
+        self._impl
+            .borrow()
+            .as_ref()?
+            .autogradmeta
+            .as_ref()?
+            .grad_fn()
+    }
+
     pub fn output_nr(&self) -> usize {
-        if let Some(meta) = self._impl.borrow().autogradmeta.as_ref() {
+        if let Some(meta) = self
+            ._impl
+            .borrow()
+            .as_ref()
+            .and_then(|i| i.autogradmeta.as_ref())
+            .as_ref()
+        {
             meta.output_nr
         } else {
             0

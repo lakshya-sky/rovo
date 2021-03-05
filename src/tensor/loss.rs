@@ -59,7 +59,7 @@ pub fn binary_cross_entropy_kernel(iter: &mut TensorIterator) {
     AT_DISPATCH_FLOATING_TYPES!(iter.dtype(), "binary_cross_entropy", || {
         cpu_kernel(
             iter,
-            Closure::new(|args: [SCALART; 2]| -> SCALART {
+            Closure::new(|args: [Scalart; 2]| -> Scalart {
                 let i = args[0];
                 let t = args[1];
                 assert!(
@@ -118,11 +118,11 @@ pub fn binary_cross_entropy_backward_kernel(iter: &mut TensorIterator) {
     AT_DISPATCH_FLOATING_TYPES!(iter.dtype(), "binary_cross_entropy_backward", || {
         cpu_kernel(
             iter,
-            Closure::new(|args: [SCALART; 3]| -> SCALART {
+            Closure::new(|args: [Scalart; 3]| -> Scalart {
                 let g = args[0];
                 let i = args[1];
                 let t = args[2];
-                g * (i - t) / (((1.0 - i) * i).max(EPSILON as SCALART))
+                g * (i - t) / (((1.0 - i) * i).max(EPSILON as Scalart))
             }),
         )
     });

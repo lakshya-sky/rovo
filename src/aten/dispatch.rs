@@ -2,7 +2,7 @@
 macro_rules! AT_PRIVATE_CASE_TYPE{
     ($_ident: expr, $enum_type: path, $type: ty, $($args:expr),+)=>{
        if let $enum_type = $_ident {
-            type SCALART = $type;
+            type Scalart = $type;
             return $($args),+()
         }
     }
@@ -13,7 +13,7 @@ macro_rules! AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2 {
     (_, _, $TYPE: expr, $name: expr, $($args:expr),+) => {{
         // match $TYPE {
         //     ScalarType::Int => {
-        //         type SCALART = i32;
+        //         type Scalart = i32;
         //         $($args)*()
         //     },
         //     _ => todo!()
@@ -30,7 +30,7 @@ macro_rules! AT_DISPATCH_ALL_TYPES_AND {
     (_,$TYPE: expr, $name: expr, $($args:expr),+) => {{
         // match $TYPE {
         //     ScalarType::Int => {
-        //         type SCALART = i32;
+        //         type Scalart = i32;
         //         $($args)*()
         //     },
         //     _ => todo!()

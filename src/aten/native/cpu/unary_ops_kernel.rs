@@ -21,10 +21,10 @@ pub fn sigmoid_kernel(iter: &mut TensorIterator) {
     AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2!(_, _, iter.dtype(), "sigmoid_cpu", || {
         loops::cpu_kernel_vec(
             iter,
-            Closure::new(|args: [SCALART; 1]| -> SCALART {
+            Closure::new(|args: [Scalart; 1]| -> Scalart {
                 let a = args[0];
-                let exp_a: SCALART = f32::exp(-a as f32) as SCALART;
-                let one: SCALART = 1 as SCALART;
+                let exp_a: Scalart = f32::exp(-a as f32) as Scalart;
+                let one: Scalart = 1 as Scalart;
                 one / (one + exp_a)
             }),
         )
@@ -35,7 +35,7 @@ pub fn neg_kernel(iter: &mut TensorIterator) {
     AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2!(_, _, iter.dtype(), "neg_cpu", || {
         loops::cpu_kernel_vec(
             iter,
-            Closure::new(|args: [SCALART; 1]| -> SCALART { -args[0] }),
+            Closure::new(|args: [Scalart; 1]| -> Scalart { -args[0] }),
         )
     })
 }

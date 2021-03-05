@@ -2,7 +2,7 @@ use rovo::core::manual_seed;
 use rovo::init_rovo;
 use rovo::nn::Linear;
 use rovo::nn::Module;
-use rovo::optim::{Optimizer, SGDOptions, SGD};
+use rovo::optim::{Optimizer, SGDOptions, Sgd};
 use rovo::tensor::loss::Reduction;
 use rovo::tensor::sigmoid;
 use rovo::tensor::{binary_cross_entropy, Tensor};
@@ -77,9 +77,9 @@ fn sequential_sgd_step() {
     model.add(Linear::new(2, 2));
     model.add(Functional::new(Functional::sigmoid()));
 
-    let mut sgd = SGD::new(model.parameters().unwrap(), SGDOptions::new(0.1));
+    let mut sgd = Sgd::new(model.parameters().unwrap(), SGDOptions::new(0.1));
 
-    let step = |optimizer: &mut SGD, model: Sequential, inputs: Tensor, target: Tensor| {
+    let step = |optimizer: &mut Sgd, model: Sequential, inputs: Tensor, target: Tensor| {
         // Note: Can't put the following line into closure beacuse
         // zero_grad uses immutable reference and step uses mutable reference.
         optimizer.zero_grad();
@@ -112,9 +112,9 @@ fn sequential_sgd_two_steps() {
     let mut model = Sequential::new();
     model.add(Linear::new(3, 2));
 
-    let mut sgd = SGD::new(model.parameters().unwrap(), SGDOptions::new(0.1));
+    let mut sgd = Sgd::new(model.parameters().unwrap(), SGDOptions::new(0.1));
 
-    let step = |optimizer: &mut SGD, model: &Sequential, inputs: Tensor, target: &Tensor| {
+    let step = |optimizer: &mut Sgd, model: &Sequential, inputs: Tensor, target: &Tensor| {
         let closure = || {
             let y = model.forward(&[&inputs]);
             let loss = target - &y;

@@ -6,7 +6,7 @@ use crate::{
 use crate::{c10::isIntegralType, tensor::TensorIterator};
 use std::{ffi::c_void, marker::PhantomData, mem::size_of, ptr::NonNull};
 
-pub fn UNARY_OUTER_LOOP<F>(data: &mut [NonNull<u8>], strides: &[usize], n: usize, f: F) -> ()
+pub fn UNARY_OUTER_LOOP<F>(data: &mut [NonNull<u8>], strides: &[usize], n: usize, f: F)
 where
     F: Fn(),
 {
@@ -19,10 +19,10 @@ where
     }
 }
 
-pub fn sum_kernel_impl(iter: &TensorIterator) -> () {
+pub fn sum_kernel_impl(iter: &TensorIterator) {
     if isIntegralType(iter.dtype(), true) {}
     AT_DISPATCH_FLOATING_TYPES_AND2!(_, _, iter.dtype(), "sum_cpu", move || {
-        iter.output().fill_(0 as SCALART);
+        iter.output().fill_(0 as Scalart);
         iter.parallel_reduce(
             |data: &[NonNull<u8>], strides: &[usize], mut size0: usize, mut size1: usize| {
                 let mut in_strides = [strides[1], strides[3]];
@@ -44,7 +44,7 @@ pub fn sum_kernel_impl(iter: &TensorIterator) -> () {
                             &inner_strides,
                             0,
                             size0,
-                            &mut Closure::new(|args: [SCALART; 2]| {
+                            &mut Closure::new(|args: [Scalart; 2]| {
                                 return args[0] + args[1];
                             }),
                         );
@@ -53,25 +53,23 @@ pub fn sum_kernel_impl(iter: &TensorIterator) -> () {
                 }
                 let out_stride = out_strides[1];
                 assert_eq!(out_strides[0], 0);
-                let vec256_size = Vec256::<SCALART>::size();
-                if in_strides[0] == std::mem::size_of::<SCALART>() && size0 >= vec256_size {
+                let vec256_size = Vec256::<Scalart>::size();
+                if in_strides[0] == std::mem::size_of::<Scalart>() && size0 >= vec256_size {
                     // Contiguous inner reduction
-                    //vectorized_inner_sum::<SCALART>(data, in_strides[1], out_stride, size0, size1);
-                    todo!()
-                } else if in_strides[1] == std::mem::size_of::<SCALART>() && size1 >= vec256_size {
+                    vectorized_inner_sum::<Scalart>(data, in_strides[1], out_stride, size0, size1);
+                } else if in_strides[1] == std::mem::size_of::<Scalart>() && size1 >= vec256_size {
                     // Contiguous outer reduction
-                    vectorized_outer_sum::<SCALART>(data, in_strides[0], out_stride, size0, size1);
+                    vectorized_outer_sum::<Scalart>(data, in_strides[0], out_stride, size0, size1);
                 } else if in_strides[0] < in_strides[1] {
-                    todo!();
-                    // scalar_inner_sum::<SCALART>(data, in_strides, out_stride, size0, size1);
+                    scalar_inner_sum::<Scalart>(data, in_strides, out_stride, size0, size1);
                 } else {
-                    todo!();
-                    // scalar_outer_sum::<SCALART>(data, in_strides, out_stride, size0, size1);
+                    scalar_outer_sum::<Scalart>(data, in_strides, out_stride, size0, size1);
                 }
             },
         );
     });
 }
+
 trait LoadImpl {
     type Output;
     fn load(data: *const c_void, stride: usize, index: usize) -> Self::Output;
@@ -98,33 +96,7 @@ impl<T: Float> LoadImpl for T {
 fn load<T: LoadImpl>(data: *const u8, stride: usize, index: usize) -> T::Output {
     T::load(data as *const c_void, stride, index)
 }
-// struct LoadImpl<T> {
-//     _ph: PhantomData<T>,
-// }
 
-// impl<T: Float> LoadImpl<Vec256<T>> {
-//     fn load(data: *const c_void, stride: usize, index: usize) -> Vec256<T> {
-//         let ptr = unsafe { data.add(index * stride) };
-//         Vec256::<T>::loadu(ptr, Vec256::<T>::size())
-//     }
-// }
-
-// impl<T: Float> LoadImpl<T> {
-//     fn load(data: *const c_void, stride: usize, index: usize) -> T {
-//         unsafe {
-//             let ptr = data.add(index * stride) as *const T;
-//             ptr.read()
-//         }
-//     }
-// }
-
-// fn load<T: Float>(data: *const u8, stride: usize, index: usize) -> T {
-//     LoadImpl::<T>::load(data as *const c_void, stride, index)
-// }
-
-// fn load<V>(data: *const u8, stride: usize, index: usize) -> T {
-//     LoadImpl::<T>::load(data as *const c_void, stride, index)
-// }
 #[inline(always)]
 fn ceil_log2(x: usize) -> usize {
     if x <= 2 {
@@ -307,6 +279,47 @@ fn accumulate_result_array<T: Float>(data: *mut u8, stride: usize, index: usize,
     }
 }
 
+fn vectorized_inner_sum<T: Float>(
+    data: &[NonNull<u8>],
+    outer_stride: usize,
+    out_stride: usize,
+    size0: usize,
+    size1: usize,
+) {
+    let vec_size = Vec256::<T>::size();
+    let size0_vec_size = Vec256::<T>::size();
+    let type_size = size_of::<T>();
+    let vec_stride = vec_size * type_size;
+    for j in 0..size1 {
+        let row_in = unsafe { data[1].as_ptr().add(j * outer_stride) };
+        let vec_acc = RowSum::<Vec256<T>>::call(row_in, vec_stride, size0_vec_size);
+        let mut final_acc = T::zero();
+        for k in vec_size * size0_vec_size..size0 {
+            final_acc = final_acc + load::<T>(row_in, type_size, k);
+        }
+        let mut partials = vec![T::zero(); Vec256::<T>::size()];
+        vec_acc.store(partials.as_mut_ptr() as *mut c_void, vec_size);
+        for k in 0..vec_size {
+            final_acc = final_acc + partials[k]
+        }
+        accumulate_result(data[0].as_ptr(), out_stride, j, final_acc);
+    }
+}
+
+fn scalar_inner_sum<T: Float>(
+    data: &[NonNull<u8>],
+    in_strides: [usize; 2],
+    out_stride: usize,
+    size0: usize,
+    size1: usize,
+) {
+    for j in 0..size1 {
+        let row_in = unsafe { data[1].as_ptr().add(j * in_strides[1]) };
+        let ans = RowSum::<T>::call(row_in, in_strides[0], size0);
+        accumulate_result(data[0].as_ptr(), out_stride, j, ans);
+    }
+}
+
 fn vectorized_outer_sum<T: Float>(
     data: &[NonNull<u8>],
     inner_stride: usize,
@@ -352,6 +365,36 @@ fn vectorized_outer_sum<T: Float>(
         }
         let row_in = unsafe { data[1].as_ptr().add(j * size_of::<T>()) };
         let ans = RowSum::<T>::call(row_in, inner_stride, size0);
+        accumulate_result(data[0].as_ptr(), out_stride, j, ans);
+        j += 1;
+    }
+}
+
+fn scalar_outer_sum<T: Float>(
+    data: &[NonNull<u8>],
+    in_strides: [usize; 2],
+    out_stride: usize,
+    size0: usize,
+    size1: usize,
+) {
+    let nrows = 4;
+
+    let mut j = 0;
+    loop {
+        if j + nrows - 1 >= size1 {
+            break;
+        }
+        let row_in = unsafe { data[1].as_ptr().add(j * in_strides[1]) };
+        let sums = MultiRowSum::<T>::call(row_in, in_strides[0], in_strides[1], size0, nrows);
+        accumulate_result_array(data[0].as_ptr(), out_stride, j, sums.as_slice());
+        j += nrows;
+    }
+    loop {
+        if j >= size1 {
+            break;
+        }
+        let row_in = unsafe { data[1].as_ptr().add(j * in_strides[1]) };
+        let ans = RowSum::<T>::call(row_in, in_strides[1], size0);
         accumulate_result(data[0].as_ptr(), out_stride, j, ans);
         j += 1;
     }

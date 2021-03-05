@@ -15,7 +15,7 @@ pub fn fill_out(self_: &Tensor, value: Scalar) {
     //Todo: add complex number condition here
     if self_.device().is_cpu() && self_.numel() == 1 {
         AT_DISPATCH_ALL_TYPES_AND!(_, self_.scalar_type(), "fill_out", || {
-            fill_fast::<SCALART>(self_, value);
+            fill_fast::<Scalart>(self_, value);
         });
     } else {
         let iter = TensorIterator::nullary_op(self_);

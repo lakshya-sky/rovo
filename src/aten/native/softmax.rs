@@ -156,7 +156,7 @@ fn host_softmax_backward<T: Float + Send>(
 pub fn log_softmax_cpu(input_: &Tensor, dim_: i64, half_to_float: bool) -> Tensor {
     assert!(
         !half_to_float,
-        "softmax with half to float conversion is not supported on CPU"
+        "softmax with half to float conversion is not supported on Cpu"
     );
     let mut input = input_.contiguous();
     let output = empty_like(&input, TensorOptions::default(), MemoryFormat::Contiguous);
@@ -209,7 +209,7 @@ pub fn log_softmax_backward_cpu(grad_: &Tensor, output_: &Tensor, dim_: i64) -> 
 
 fn run_dispatch_log_softmax_forward(input: &Tensor, output: &Tensor, dim: usize) {
     AT_DISPATCH_FLOATING_TYPES!(input.scalar_type(), "log_softmax", || {
-        host_softmax::<SCALART>(output, input, dim, true)
+        host_softmax::<Scalart>(output, input, dim, true)
     });
 }
 
@@ -220,6 +220,6 @@ fn run_dispatch_log_softmax_backward(
     dim: usize,
 ) {
     AT_DISPATCH_FLOATING_TYPES!(grad.scalar_type(), "log_softmax_backward", || {
-        host_softmax_backward::<SCALART>(grad_input, grad, output, dim, true)
+        host_softmax_backward::<Scalart>(grad_input, grad, output, dim, true)
     });
 }

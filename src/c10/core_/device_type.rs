@@ -1,11 +1,11 @@
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum DeviceType {
-    CPU,
-    CUDA,
+    Cpu,
+    Cuda,
     COMPILE_TIME_MAX_DEVICE_TYPE,
 }
-pub const KCPU: DeviceType = DeviceType::CPU;
-pub const KCUDA: DeviceType = DeviceType::CUDA;
+pub const KCPU: DeviceType = DeviceType::Cpu;
+pub const KCUDA: DeviceType = DeviceType::Cuda;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Device {
@@ -16,7 +16,7 @@ pub struct Device {
 impl Default for Device {
     fn default() -> Self {
         Self {
-            type_: DeviceType::CPU,
+            type_: DeviceType::Cpu,
             index: -1,
         }
     }
@@ -34,7 +34,7 @@ impl Device {
     }
 
     pub fn is_cpu(&self) -> bool {
-        self == DeviceType::CPU
+        self == DeviceType::Cpu
     }
     /// Returns true if the device has a non-default index.
     pub fn has_index(&self) -> bool {

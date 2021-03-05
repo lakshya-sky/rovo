@@ -13,16 +13,16 @@ pub fn argmax_kernel_impl(iter: &TensorIterator) {
     AT_DISPATCH_ALL_TYPES_AND!(_, iter.dtype_(1), "argmax_cpu", || {
         binary_kernel_reduce(
             iter,
-            ArgMaxOps::<SCALART>::new(),
-            (lower_bound::<SCALART>(), 0),
+            ArgMaxOps::<Scalart>::new(),
+            (lower_bound::<Scalart>(), 0),
         )
     });
 }
 
 pub fn mean_kernel_impl(iter: &TensorIterator) {
     AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2!(_, _, iter.dtype(), "mean_cpu", || {
-        let factor = iter.num_output_elements() as SCALART / iter.numel() as SCALART;
-        binary_kernel_reduce(iter, MeanOps::<SCALART, SCALART>::new(factor), 0 as SCALART);
+        let factor = iter.num_output_elements() as Scalart / iter.numel() as Scalart;
+        binary_kernel_reduce(iter, MeanOps::<Scalart, Scalart>::new(factor), 0 as Scalart);
     });
 }
 

@@ -390,12 +390,7 @@ where
 }
 
 #[inline(always)]
-pub fn map<T: num::Float, M>(
-    mut vec_fun: M,
-    output_data: *mut T,
-    input_data: *mut T,
-    size: usize,
-) -> ()
+pub fn map<T: num::Float, M>(mut vec_fun: M, output_data: *mut T, input_data: *mut T, size: usize)
 where
     M: FnMut(Vec256<T>) -> Vec256<T>,
 {
@@ -427,8 +422,7 @@ pub fn map2<T: num::Float, M>(
     input_data: *mut T,
     input_data2: *mut T,
     size: usize,
-) -> ()
-where
+) where
     M: FnMut(Vec256<T>, Vec256<T>) -> Vec256<T>,
 {
     let mut d = 0;

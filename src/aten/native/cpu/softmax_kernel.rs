@@ -169,7 +169,7 @@ fn _vec_host_softmax_backward_lastdim<T: num::Float>(
 struct vec_host_softmax_lastdim;
 impl vec_host_softmax_lastdim {
     #[inline(always)]
-    pub fn apply<SCALART: num::Float + PartialOrd, const CHUNK_SIZE: usize>(
+    pub fn apply<Scalart: num::Float + PartialOrd, const CHUNK_SIZE: usize>(
         output: &Tensor,
         input: &Tensor,
         log_softmax: bool,
@@ -177,11 +177,11 @@ impl vec_host_softmax_lastdim {
         let outer_size = input.sizes()[0..input.ndimension() - 1].iter().product();
         let dim_size = input.size(input.dim() - 1);
 
-        let input_data_base = input.data_ptr_casted::<SCALART>();
-        let output_data_base = output.data_ptr_casted::<SCALART>();
+        let input_data_base = input.data_ptr_casted::<Scalart>();
+        let output_data_base = output.data_ptr_casted::<Scalart>();
 
         if log_softmax {
-            _vec_log_softmax_lastdim::<SCALART, CHUNK_SIZE>(
+            _vec_log_softmax_lastdim::<Scalart, CHUNK_SIZE>(
                 input_data_base,
                 output_data_base,
                 outer_size,
@@ -196,7 +196,7 @@ impl vec_host_softmax_lastdim {
 struct vec_host_softmax_backward_lastdim;
 impl vec_host_softmax_backward_lastdim {
     #[inline(always)]
-    pub fn apply<SCALART: num::Float>(
+    pub fn apply<Scalart: num::Float>(
         grad_input: &Tensor,
         grad: &Tensor,
         output: &Tensor,
@@ -205,11 +205,11 @@ impl vec_host_softmax_backward_lastdim {
         let dim_size = grad.size(grad.dim() - 1);
         let outer_size = grad.sizes()[0..grad.ndimension() - 1].iter().product();
 
-        let grad_input_data_base = grad_input.data_ptr_casted::<SCALART>();
-        let grad_data_base = grad.data_ptr_casted::<SCALART>();
-        let output_data_base = output.data_ptr_casted::<SCALART>();
+        let grad_input_data_base = grad_input.data_ptr_casted::<Scalart>();
+        let grad_data_base = grad.data_ptr_casted::<Scalart>();
+        let output_data_base = output.data_ptr_casted::<Scalart>();
         if log_softmax {
-            _vec_host_softmax_backward_lastdim::<SCALART>(
+            _vec_host_softmax_backward_lastdim::<Scalart>(
                 grad_input_data_base,
                 grad_data_base,
                 output_data_base,
@@ -231,9 +231,9 @@ pub fn log_softmax_lastdim_kernel_impl(result: &Tensor, self_: &Tensor) {
         self_.scalar_type(),
         "log_softmax_lastdim_kernel_impl",
         || {
-            const scalar_size: usize = std::mem::size_of::<SCALART>();
+            const scalar_size: usize = std::mem::size_of::<Scalart>();
             const CHUNK_SIZE: usize = (128 / scalar_size) * (32 * scalar_size);
-            vec_host_softmax_lastdim::apply::<SCALART, CHUNK_SIZE>(result, self_, true);
+            vec_host_softmax_lastdim::apply::<Scalart, CHUNK_SIZE>(result, self_, true);
         }
     );
 }
@@ -250,7 +250,7 @@ pub fn log_softmax_backward_lastdim_kernel_impl(
         grad.scalar_type(),
         "log_softmax_backward_lastdim_kernel_impl",
         || {
-            vec_host_softmax_backward_lastdim::apply::<SCALART>(grad_input, grad, output, true);
+            vec_host_softmax_backward_lastdim::apply::<Scalart>(grad_input, grad, output, true);
         }
     )
 }

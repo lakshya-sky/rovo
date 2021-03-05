@@ -5,7 +5,7 @@ use rovo::{
     core::manual_seed,
     init_rovo,
     nn::{nll_loss, Functional, Linear, Module, NLLLossFuncOptions, Sequential},
-    optim::{Optimizer, SGDOptions, SGDOptionsBuilder, SGD},
+    optim::{Optimizer, SGDOptions, SGDOptionsBuilder, Sgd},
     tensor::{log_softmax, Tensor},
 };
 use std::{
@@ -96,8 +96,8 @@ fn mnist_nn() {
     model.add(Functional::new(Functional::sigmoid()));
     model.add(Linear::new(32, 10));
     let sgd_options = SGDOptionsBuilder::new(0.01).momentum(0.0).build();
-    let mut sgd = SGD::new(model.parameters().unwrap(), sgd_options);
-    let step = |optimizer: &mut SGD, model: &Sequential, inputs: Tensor, target: Tensor| {
+    let mut sgd = Sgd::new(model.parameters().unwrap(), sgd_options);
+    let step = |optimizer: &mut Sgd, model: &Sequential, inputs: Tensor, target: Tensor| {
         optimizer.zero_grad();
         let closure = || {
             let y = model.forward(&[&inputs]);

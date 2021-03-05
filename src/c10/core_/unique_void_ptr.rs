@@ -36,7 +36,7 @@ impl<T> Drop for Unique<T> {
 impl<T> Unique<T> {
     pub fn new(inner: Option<NonNull<T>>) -> Self {
         Self {
-            inner: inner,
+            inner,
             deleter: delete_nothing,
         }
     }

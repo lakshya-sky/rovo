@@ -98,7 +98,7 @@ impl TensorDataContainer {
         }
     }
 
-    fn fill_tensor(self, tensor: &Tensor) -> () {
+    fn fill_tensor(self, tensor: &Tensor) {
         if self.is_scalar() {
             assert!(
                 tensor.dim() == 0,
@@ -137,24 +137,6 @@ impl TensorDataContainer {
     }
       */
 }
-
-// impl From<f32> for TensorDataContainer {
-//     fn from(val: f32) -> Self {
-//         TensorDataContainer::from_scalar(val.into(), ScalarType::Float)
-//     }
-// }
-
-// impl From<&[f32]> for TensorDataContainer {
-//     fn from(values: &[f32]) -> Self {
-//         Self::from_slice(values, ScalarType::Float)
-//     }
-// }
-
-// impl<const N: usize> From<&[f32; N]> for TensorDataContainer {
-//     fn from(values: &[f32; N]) -> Self {
-//         Self::from_slice(&values[..], ScalarType::Float)
-//     }
-// }
 
 macro_rules! IMPL_TENSORDATECONTAINER {
     ($scalar_type: expr, $t:ty) => {

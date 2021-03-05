@@ -1,6 +1,5 @@
 use super::*;
 use crate::c10::TensorOptions;
-use crate::engine::Engine;
 use crate::tensor::*;
 use crate::util_autograd;
 
