@@ -17,34 +17,54 @@ pub struct SavedTensor {
     version_counter: TensorVersion,
 }
 
+impl Default for SavedTensor {
+    fn default() -> Self {
+        Self {
+            data: Tensor::default(),
+            was_default_constructed: true,
+            grad_accumulator: None,
+            grad_fn: None,
+            saved_version: 0,
+            output_nr: 0,
+            requires_grad: false,
+            has_grad_fn: false,
+            version_counter: TensorVersion::default(),
+        }
+    }
+}
+
 impl SavedTensor {
     pub fn new(tensor: &Tensor, is_output: bool) -> Self {
-        let was_default_constructed = false;
-        let output_nr = tensor.output_nr();
-        let requires_grad = tensor.requires_grad();
-        let has_grad_fn = !tensor.is_leaf();
-        let data = tensor.tensor_data();
-        let mut grad_accumulator: Option<Weak<RefCell<Node>>> = None;
-        let mut grad_fn = None;
-        if tensor.is_leaf() {
-            grad_accumulator =
-                util_autograd::grad_accumulator(tensor).and_then(|acc| Some(Rc::downgrade(&acc)));
-        // Some(Rc::downgrade(&util_autograd::grad_accumulator(tensor)));
-        } else if !is_output {
-            grad_fn = tensor.grad_fn();
-        }
-        let version_counter = util_autograd::TensorHook::version_counter(tensor).clone();
-        let saved_version = version_counter.current_version();
-        Self {
-            data,
-            grad_accumulator,
-            grad_fn,
-            saved_version,
-            output_nr,
-            was_default_constructed,
-            requires_grad,
-            has_grad_fn,
-            version_counter,
+        if tensor.defined() {
+            let was_default_constructed = false;
+            let output_nr = tensor.output_nr();
+            let requires_grad = tensor.requires_grad();
+            let has_grad_fn = !tensor.is_leaf();
+            let data = tensor.tensor_data();
+            let mut grad_accumulator: Option<Weak<RefCell<Node>>> = None;
+            let mut grad_fn = None;
+            if tensor.is_leaf() {
+                grad_accumulator = util_autograd::grad_accumulator(tensor)
+                    .and_then(|acc| Some(Rc::downgrade(&acc)));
+            // Some(Rc::downgrade(&util_autograd::grad_accumulator(tensor)));
+            } else if !is_output {
+                grad_fn = tensor.grad_fn();
+            }
+            let version_counter = util_autograd::TensorHook::version_counter(tensor).clone();
+            let saved_version = version_counter.current_version();
+            Self {
+                data,
+                grad_accumulator,
+                grad_fn,
+                saved_version,
+                output_nr,
+                was_default_constructed,
+                requires_grad,
+                has_grad_fn,
+                version_counter,
+            }
+        } else {
+            Self::default()
         }
     }
 
@@ -53,38 +73,17 @@ impl SavedTensor {
             Some(t) => t.clone(),
             None => Tensor::default(),
         };
-        Self::new_consume(t, is_output)
-    }
-
-    pub fn new_consume(tensor: Tensor, is_output: bool) -> Self {
-        let was_default_constructed = false;
-        let output_nr = tensor.output_nr();
-        let requires_grad = tensor.requires_grad();
-        let has_grad_fn = !tensor.is_leaf();
-        let mut grad_accumulator: Option<Weak<RefCell<Node>>> = None;
-        let mut grad_fn = None;
-        if tensor.is_leaf() {
-            grad_accumulator =
-                util_autograd::grad_accumulator(&tensor).and_then(|acc| Some(Rc::downgrade(&acc)));
-        } else if !is_output {
-            grad_fn = tensor.grad_fn();
-        }
-        let version_counter = util_autograd::TensorHook::version_counter(&tensor).clone();
-        let saved_version = version_counter.current_version();
-        Self {
-            data: tensor,
-            grad_accumulator,
-            grad_fn,
-            saved_version,
-            output_nr,
-            was_default_constructed,
-            requires_grad,
-            has_grad_fn,
-            version_counter,
-        }
+        Self::new(&t, is_output)
     }
 
     pub fn unpack(&self) -> Tensor {
+        if !self.data.defined() {
+            if !self.was_default_constructed {
+                panic!("Not sure but pytorch throws error with ERR_BACKWARD_TWICE")
+            }
+            return Tensor::default();
+        }
+
         if self.saved_version != self.version_counter.current_version() {
             panic!()
         }

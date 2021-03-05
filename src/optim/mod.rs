@@ -138,14 +138,14 @@ impl SGDOptions {
     }
 }
 
-pub struct SGD {
+pub struct Sgd {
     param_groups: Vec<OptimizerParamGroup>,
     options: SGDOptions,
 }
 
-impl SGD {
+impl Sgd {
     pub fn new(params: Vec<Tensor>, options: SGDOptions) -> Self {
-        SGD::new_from_param_group(vec![OptimizerParamGroup::new(params)], options)
+        Sgd::new_from_param_group(vec![OptimizerParamGroup::new(params)], options)
     }
 
     fn new_from_param_group(param_groups: Vec<OptimizerParamGroup>, options: SGDOptions) -> Self {
@@ -156,7 +156,7 @@ impl SGD {
     }
 }
 
-impl Optimizer for SGD {
+impl Optimizer for Sgd {
     fn step<F>(&mut self, closure: Option<F>) -> Tensor
     where
         F: FnMut() -> Tensor,
@@ -207,7 +207,7 @@ impl Optimizer for SGD {
 
 #[cfg(test)]
 mod test {
-    use super::{Optimizer, SGDOptions, SGD};
+    use super::{Optimizer, SGDOptions, Sgd};
     use crate::{autograd::ones, core::manual_seed, nn::Module};
     use crate::{
         autograd::{backward, full},
@@ -224,11 +224,11 @@ mod test {
         manual_seed(0);
         let linear = Linear::new(3, 2);
         let sigmoid = Functional::new(Functional::sigmoid());
-        let mut sgd = SGD::new(linear.parameters().unwrap(), SGDOptions::new(0.1));
+        let mut sgd = Sgd::new(linear.parameters().unwrap(), SGDOptions::new(0.1));
         let x = full(&[4, 3], 1.5, TensorOptions::with_requires_grad());
         let target = ones(&[4, 2], None);
 
-        let step = |optimizer: &mut SGD,
+        let step = |optimizer: &mut Sgd,
                     linear: Linear,
                     sigmoid: Functional,
                     inputs: Tensor,

@@ -11,15 +11,15 @@ pub fn copy_kernel(_: DeviceType, iter: &mut TensorIterator, _non_blocking: bool
         AT_DISPATCH_ALL_TYPES_AND!(_, dtype, "copy_kernel", || {
             cpu_kernel_vec(
                 iter,
-                Closure::new(|args: [SCALART; 1]| -> SCALART { args[0] }),
+                Closure::new(|args: [Scalart; 1]| -> Scalart { args[0] }),
             )
         });
     } else {
         AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2!(_, _, dtype, "copy_", || {
-            type DEST = SCALART;
+            type Dest = Scalart;
             AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2!(_, _, iter.dtype_(1), "copy_", || {
-                let closure = Closure::new(|src: [SCALART; 1]| -> DEST {
-                    cast_with_inter_type::<SCALART, DEST>(src[0])
+                let closure = Closure::new(|src: [Scalart; 1]| -> Dest {
+                    cast_with_inter_type::<Scalart, Dest>(src[0])
                 });
                 cpu_kernel(iter, closure);
             })

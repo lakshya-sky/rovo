@@ -50,11 +50,11 @@ pub fn get_default_cpu_allocator() -> *mut DefaultCPUAllocator {
 }
 
 pub fn register_cpu_allocator() {
-    reigster_allocator(get_default_cpu_allocator(), DeviceType::CPU)
+    reigster_allocator(get_default_cpu_allocator(), DeviceType::Cpu)
 }
 
 pub fn get_cpu_allocator() -> *mut dyn Allocator {
-    get_allocator(DeviceType::CPU)
+    get_allocator(DeviceType::Cpu)
 }
 
 #[cfg(test)]
@@ -74,7 +74,7 @@ mod test {
     fn test_allocation_assignment() {
         unsafe {
             crate::init_rovo();
-            let allocator = crate::c10::get_allocator(DeviceType::CPU);
+            let allocator = crate::c10::get_allocator(DeviceType::Cpu);
             {
                 let data = (&*allocator).allocate(4);
                 let ptr = data.get();

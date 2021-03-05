@@ -1,5 +1,5 @@
 pub mod loss;
-mod tensor;
+mod tensor_;
 mod tensor_impl;
 mod tensor_iterator;
 mod tensor_oprators;
@@ -7,7 +7,7 @@ mod tensor_ops;
 mod tensor_shape;
 mod tensor_util;
 // pub use self::loss;
-pub use tensor::*;
+pub use tensor_::*;
 pub use tensor_impl::*;
 pub use tensor_iterator::*;
 pub use tensor_oprators::*;

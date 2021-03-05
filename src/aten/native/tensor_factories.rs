@@ -183,8 +183,8 @@ fn tensor_cpu_kernel<T>(result: &Tensor, values: &[T]) {
     AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2!(_, _, result.scalar_type(), "tensor_cpu", || {
         unsafe {
             copy_nonoverlapping(
-                values.as_ptr() as *mut SCALART,
-                result.data_ptr_casted::<SCALART>(),
+                values.as_ptr() as *mut Scalart,
+                result.data_ptr_casted::<Scalart>(),
                 values.len(),
             );
         }

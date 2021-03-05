@@ -12,7 +12,6 @@ extern crate blas_src;
 pub mod aten;
 pub mod c10;
 pub mod core;
-mod engine;
 pub mod nn;
 mod ops;
 pub mod optim;

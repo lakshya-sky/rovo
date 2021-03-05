@@ -3,17 +3,17 @@ use crate::tensor::{Tensor, TensorImpl};
 
 #[derive(PartialEq)]
 pub enum MemOverlap {
-    NO,
-    YES,
-    TOOHARD,
+    No,
+    Yes,
+    TooHard,
 }
 
 #[derive(PartialEq)]
 pub enum MemOverlapStatus {
-    FULL,
-    PARTIAL,
-    NO,
-    TOOHARD,
+    Full,
+    Partial,
+    No,
+    TooHard,
 }
 
 pub fn has_internal_overlap(tensor: &Tensor) -> MemOverlap {
@@ -24,18 +24,18 @@ pub fn has_internal_overlap_(t: &TensorImpl) -> MemOverlap {
     assert!(t.layout() == K_STRIDED);
 
     if t.is_contiguous() {
-        return MemOverlap::NO;
+        return MemOverlap::No;
     }
 
     let strides = t.strides();
     let sizes = t.sizes();
     for i in 0..strides.len() {
         if strides[i] == 0 && sizes[i] > 1 {
-            return MemOverlap::YES;
+            return MemOverlap::Yes;
         }
     }
 
-    return MemOverlap::TOOHARD;
+    return MemOverlap::TooHard;
 }
 
 pub fn assert_no_internal_overlap(tensor: &Tensor) {
@@ -44,7 +44,7 @@ pub fn assert_no_internal_overlap(tensor: &Tensor) {
 
 pub fn assert_no_internal_overlap_(t: &TensorImpl) {
     assert!(
-        has_internal_overlap_(t) != MemOverlap::YES,
+        has_internal_overlap_(t) != MemOverlap::Yes,
         "unsupported operation: more than one element of the written-to tensor 
       refers to a single memory location. Please clone() the tensor before 
       performing the operation."
@@ -57,13 +57,13 @@ pub fn get_overlap_status(a: &Tensor, b: &Tensor) -> MemOverlapStatus {
 
 pub fn get_overlap_status_(a: &TensorImpl, b: &TensorImpl) -> MemOverlapStatus {
     if a as *const TensorImpl == b as *const TensorImpl {
-        return MemOverlapStatus::FULL;
+        return MemOverlapStatus::Full;
     }
     if a.numel() == 0 || b.numel() == 0 {
-        return MemOverlapStatus::NO;
+        return MemOverlapStatus::No;
     }
     if !a.is_contiguous() || !b.is_contiguous() {
-        return MemOverlapStatus::TOOHARD;
+        return MemOverlapStatus::TooHard;
     }
 
     if a.storage().data::<u8>() == b.storage().data::<u8>() {
@@ -74,14 +74,14 @@ pub fn get_overlap_status_(a: &TensorImpl, b: &TensorImpl) -> MemOverlapStatus {
             let b_end = b_begin.offset((b.numel() * b.itemsize()) as isize);
 
             if a_begin == b_begin && a_end == b_end {
-                return MemOverlapStatus::FULL;
+                return MemOverlapStatus::Full;
             }
             if a_begin < b_end && b_begin < a_end {
-                return MemOverlapStatus::PARTIAL;
+                return MemOverlapStatus::Partial;
             }
         }
     }
-    return MemOverlapStatus::NO;
+    return MemOverlapStatus::No;
 }
 
 pub fn assert_no_partial_overlap(a: &Tensor, b: &Tensor) {
@@ -89,7 +89,7 @@ pub fn assert_no_partial_overlap(a: &Tensor, b: &Tensor) {
 }
 pub fn assert_no_partial_overlap_(a: &TensorImpl, b: &TensorImpl) {
     assert!(
-        get_overlap_status_(a, b) != MemOverlapStatus::PARTIAL,
+        get_overlap_status_(a, b) != MemOverlapStatus::Partial,
         "unsupported operation: some elements of the input tensor and
         the written-to tensor refer to a single memory location. 
         Please clone() the tensor before performing the operation."

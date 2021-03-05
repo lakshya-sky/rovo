@@ -12,9 +12,9 @@ use std::{ffi::c_void, ops::Range, ptr::NonNull};
 pub type DimMask = BitSet<64>;
 pub type DimVector = smallvec::SmallVec<[usize; 5]>;
 type StrideVector = smallvec::SmallVec<[usize; 6]>;
-type LOOP = fn(&[NonNull<u8>], &[usize], usize);
-type LOOP2D = fn(&[NonNull<u8>], &[usize], usize, usize);
-type LOOP_SUBITER = fn(&TensorIterator);
+type Loop = fn(&[NonNull<u8>], &[usize], usize);
+type Loop2D = fn(&[NonNull<u8>], &[usize], usize, usize);
+type LoopSubIter = fn(&TensorIterator);
 // For now using Tensor type as OperandInfo, but when Tensor supports other types
 // This needs to have a new struct similar to pytorch.
 
@@ -116,7 +116,7 @@ impl NewOperandInfo {
                 original_tensor: None,
                 stride_bytes: StrideVector::new(),
                 data: None,
-                target_dtype: target_dtype,
+                target_dtype,
                 current_dtype: target_dtype,
                 device: Device::default(),
             }
@@ -145,10 +145,10 @@ impl NewOperandInfo {
 }
 #[derive(PartialEq)]
 enum FastSetupType {
-    NONE,
-    CONTIGUOUS,
-    CHANNELSLAST,
-    NONOVERLAPPINGDENSE,
+    None,
+    Contiguous,
+    ChannelsLast,
+    NonOverLappingDense,
 }
 
 // TensorIterator currently doesn't support the feature of having a Tensor
@@ -206,7 +206,7 @@ impl TensorIterator {
         count
     }
 
-    fn select_all_keeping_dim(&mut self, start_dim: usize, indices: &[usize]) -> () {
+    fn select_all_keeping_dim(&mut self, start_dim: usize, indices: &[usize]) {
         assert!(start_dim <= self.ndim());
         for i in start_dim..self.ndim() {
             for op in self.operands_.iter_mut() {
@@ -738,11 +738,11 @@ impl TensorIterator {
     }
     fn fast_setup(&mut self, config: &TensorIteratorConfig) -> bool {
         let setup_type = self.compute_fast_setup_type(config);
-        if setup_type == FastSetupType::NONE {
+        if setup_type == FastSetupType::None {
             return false;
         }
         match setup_type {
-            FastSetupType::CONTIGUOUS => {
+            FastSetupType::Contiguous => {
                 for i in 0..self.num_outputs_ {
                     let op = &mut self.operands_[i];
                     if !op.tensor.defined() {
@@ -775,7 +775,7 @@ impl TensorIterator {
 
     fn compute_fast_setup_type(&self, _config: &TensorIteratorConfig) -> FastSetupType {
         if self.is_reduction_ || !self.all_ops_same_shape_ {
-            return FastSetupType::NONE;
+            return FastSetupType::None;
         }
         let mut is_contiguous = true;
         // let mut is_channels_last = true;
@@ -788,9 +788,9 @@ impl TensorIterator {
             }
         }
         if is_contiguous {
-            return FastSetupType::CONTIGUOUS;
+            return FastSetupType::Contiguous;
         }
-        FastSetupType::NONE
+        FastSetupType::None
     }
 
     pub fn nullary_op(output: &Tensor) -> Self {
@@ -1010,7 +1010,7 @@ impl TensorIterator {
         }
     }
 
-    pub fn parallel_reduce(&self, loop_: LOOP2D) {
+    pub fn parallel_reduce(&self, loop_: Loop2D) {
         assert!(
             self.ntensors() == 2,
             "parallel_reduce only supports one input and one output"
@@ -1032,11 +1032,11 @@ impl TensorIterator {
         return self.output().numel() == 1;
     }
 
-    fn two_pass_reduction(&self, _loop_: LOOP2D) {
+    fn two_pass_reduction(&self, _loop_: Loop2D) {
         todo!();
     }
 
-    fn parallel_dim_reduction(&self, _loop_: LOOP2D) {
+    fn parallel_dim_reduction(&self, _loop_: Loop2D) {
         todo!()
     }
 

@@ -343,11 +343,11 @@ pub fn mm<T: AsRef<Tensor>>(mat1: &Tensor, mat2: T, consume: bool) -> Tensor {
         };
         _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[mat1, mat2]));
         _grad_fn.self_ = Some(SavedTensor::new(mat1, false));
-        if consume {
-            _grad_fn.mat2_ = Some(SavedTensor::new_consume(mat2.clone(), false));
-        } else {
+        // if consume {
+        //     _grad_fn.mat2_ = Some(SavedTensor::new(mat2, false));
+        // } else {
             _grad_fn.mat2_ = Some(SavedTensor::new(&mat2, false));
-        }
+        // }
         _grad_fn.mat2_sizes = mat2.sizes().to_vec();
 
         grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
@@ -513,11 +513,7 @@ pub fn binary_cross_entropy(
         _grad_fn.set_next_edges(util_autograd::collect_next_edges(&[input]));
         _grad_fn.self_ = Some(SavedTensor::new(input, false));
         _grad_fn.target_ = Some(SavedTensor::new(target, false));
-        if let Some(weight) = weight {
-            _grad_fn.weight_ = Some(SavedTensor::new(weight, false));
-        } else {
-            _grad_fn.weight_ = Some(SavedTensor::new_consume(Tensor::default(), false))
-        }
+        _grad_fn.weight_ = Some(SavedTensor::new_with_optional(weight, false));
         _grad_fn.reduction = reduction;
         grad_fn = Some(Rc::new(RefCell::new(Node::new(_grad_fn))));
     }

@@ -31,13 +31,15 @@ impl TensorHook {
     }
 
     pub fn get_autograd_meta(tensor: &Tensor) -> Option<&mut AutogradMeta> {
-        let w = unsafe { &mut *tensor._impl.clone().as_ptr() };
-        w.get_autogradmeta()
+        tensor.get_tensor_impl().and_then(|i| i.get_autogradmeta())
     }
 
-    // Todo: Use get_autograd_meta here instead of set_gradient_edge()
     pub fn materialize_autograd_meta(tensor: &Tensor) -> &mut AutogradMeta {
-        let mut p = tensor._impl.borrow_mut();
+        assert!(
+            tensor.defined(),
+            "cannot call materialize_autograd_meta() on an undefined Tensor"
+        );
+        let p = tensor.get_unsafe_tensor_impl();
         if p.autogradmeta.as_ref().is_none() {
             p.set_autograd_meta(Some(AutogradMetaFactory::make()))
         }
@@ -52,6 +54,10 @@ impl TensorHook {
     }
 
     pub fn version_counter(tensor: &Tensor) -> &TensorVersion {
+        assert!(
+            tensor.defined(),
+            "cannot call version_counter() on undefined tensor",
+        );
         tensor.get_unsafe_tensor_impl().version_counter()
     }
 
@@ -61,6 +67,10 @@ impl TensorHook {
     }
 
     pub fn set_version_counter(tensor: &Tensor, version_counter: TensorVersion) {
+        assert!(
+            tensor.defined(),
+            "cannot call set_version_counter() on undefined tensor"
+        );
         let impl_ = tensor.get_unsafe_tensor_impl();
         impl_.set_version_counter(version_counter);
     }
@@ -113,9 +123,7 @@ pub fn collect_next_edges(tensors: &[&Tensor]) -> Vec<Edge> {
 pub fn set_gradient_edge(tensor: &Tensor, args: (Rc<RefCell<Node>>, usize)) {
     let edge = Edge::new(Some(args.0), args.1);
     // Todo: read todo on materialize_autograd_meta
-    TensorHook::materialize_autograd_meta(tensor);
-
-    let mut meta = tensor._impl.borrow_mut();
+    let meta = TensorHook::materialize_autograd_meta(tensor);
     meta.set_grad_fn(edge.function);
     meta.set_output_nr(edge.input_nr);
 }

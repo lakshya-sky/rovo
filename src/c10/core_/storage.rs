@@ -83,6 +83,7 @@ impl StorageImpl {
 pub struct Storage {
     storage_impl: Rc<RefCell<StorageImpl>>,
 }
+
 unsafe impl Sync for Storage {}
 unsafe impl Send for Storage {}
 

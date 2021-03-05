@@ -6,7 +6,7 @@ struct Context;
 impl Context {
     pub fn default_generator(&self, device: DeviceType) -> &'static mut Generator {
         match device {
-            DeviceType::CPU => get_default_cpu_generator(),
+            DeviceType::Cpu => get_default_cpu_generator(),
             _ => todo!(),
         }
     }

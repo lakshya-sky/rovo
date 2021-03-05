@@ -91,7 +91,7 @@ fn nll_loss_forward_out_cpu_template(
     );
     total_weight.resize(&[], None);
     AT_DISPATCH_FLOATING_TYPES!(input.scalar_type(), "nll_loss_out_frame", || {
-        nll_loss_out_frame::<SCALART>(
+        nll_loss_out_frame::<Scalart>(
             output,
             total_weight,
             input,
@@ -417,7 +417,7 @@ fn nll_loss_backward_out_cpu_template(
         "weight tensor should be defined either for all or no classes"
     );
     AT_DISPATCH_FLOATING_TYPES!(input.scalar_type(), "nll_loss_backward_out_frame", || {
-        nll_loss_backward_out_frame::<SCALART>(
+        nll_loss_backward_out_frame::<Scalart>(
             grad_input,
             grad_output,
             input,

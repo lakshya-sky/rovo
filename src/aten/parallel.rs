@@ -14,7 +14,7 @@ pub fn divup(x: usize, y: usize) -> usize {
 pub const GRAIN_SIZE: usize = 32768;
 pub fn parallel_for<F>(begin: usize, end: usize, grain_size: usize, mut f: F)
 where
-    F: FnMut(usize, usize) -> () + Send,
+    F: FnMut(usize, usize) + Send,
 {
     if begin >= end {
         return;
@@ -89,7 +89,7 @@ impl internal {
 
 fn _parallel_run<F>(begin: usize, end: usize, grain_size: usize, mut f: F)
 where
-    F: FnMut(usize, usize, usize) -> () + Send,
+    F: FnMut(usize, usize, usize) + Send,
 {
     lazy_init_num_threads();
     let (num_tasks, chunk_size) = calc_num_tasks_and_chunk_size(begin, end, grain_size);
@@ -176,7 +176,7 @@ pub fn _get_intraop_pool() -> &'static ThreadPool {
 }
 fn _run_with_pool<F>(mut f: F, range: usize)
 where
-    F: FnMut(usize, usize) -> () + Send,
+    F: FnMut(usize, usize) + Send,
 {
     for i in 1..range {
         _get_intraop_pool().install(|| f(i, i));

@@ -206,7 +206,7 @@ impl TensorOptions {
         if self.has_device {
             self.device.clone()
         } else {
-            Device::new(DeviceType::CPU, None)
+            Device::new(DeviceType::Cpu, None)
         }
     }
 

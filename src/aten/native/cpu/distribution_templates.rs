@@ -7,8 +7,8 @@ use crate::AT_DISPATCH_FLOATING_TYPES_AND2;
 
 pub fn uniform_kernel(mut iter: TensorIterator, from: f64, to: f64, gen: &mut dyn GeneratorImpl) {
     AT_DISPATCH_FLOATING_TYPES_AND2!(_, _, iter.dtype(), "uniform_cpu_kernel", || {
-        let from = from as SCALART;
-        let to = to as SCALART;
+        let from = from as Scalart;
+        let to = to as Scalart;
         let uniform = UniformRealDistribution::new(from, to);
         let closure = Closure::new(|_args: [f64; 0]| uniform.call(gen));
         native::cpu_serial_kernel(&mut iter, closure);
@@ -32,15 +32,15 @@ pub fn normal_kernel(self_: &Tensor, mean: f64, std: f64, gen: &mut dyn Generato
             ScalarType::Byte => {}
             ScalarType::Int => {}
             ScalarType::Float => {
-                type SCALAR = f32;
+                type Scalar = f32;
                 if size >= 16 && self_.is_contiguous() {
-                    normal_fill(self_, mean as SCALAR, std as SCALAR, gen);
+                    normal_fill(self_, mean as Scalar, std as Scalar, gen);
                 } else {
                     let mut iter = crate::tensor::TensorIterator::nullary_op(self_);
 
                     let closure = Closure::new(|_args: [f64; 0]| {
                         let normal = NormalDistribution::new(mean, std);
-                        normal.call(gen) as SCALAR
+                        normal.call(gen) as Scalar
                     });
                     crate::aten::native::cpu_serial_kernel(&mut iter, closure);
                 }

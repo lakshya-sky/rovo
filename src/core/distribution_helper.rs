@@ -51,11 +51,9 @@ where
                 let ret = unsafe { ret.assume_init() };
                 return transformation_helper::normal(ret, self.mean, self.std);
             }
-        } else {
-            if maybe_get_next_float_normal_sample(gen, ret.as_mut_ptr()) {
-                let ret = unsafe { ret.assume_init() };
-                return transformation_helper::normal(ret, self.mean, self.std);
-            }
+        } else if maybe_get_next_float_normal_sample(gen, ret.as_mut_ptr()) {
+            let ret = unsafe { ret.assume_init() };
+            return transformation_helper::normal(ret, self.mean, self.std);
         }
         let uniform = UniformRealDistribution::<T>::new(0.0.into(), 1.0.into());
         // 0.10037074167330773
